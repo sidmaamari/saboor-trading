@@ -4,7 +4,7 @@ Builds the ranked watchlist for the day. This is the only place the watchlist is
 """
 from datetime import date
 from tools.alpaca_client import get_bars, get_price
-from tools.zoya_client import batch_check
+from tools.sharia_screener import bulk_screen
 from agents.researcher import build_dossiers
 from agents.analyst import score_stocks, _calculate_momentum
 from db.queries import save_watchlist, log_decision, update_positions_days_held
@@ -26,21 +26,21 @@ def run():
     all_tickers = get_universe()
     print(f"\nUniverse: {len(all_tickers)} tickers")
 
-    # ── Step 2: Sharia gate via Zoya ─────────────────────────────────────────
-    print("Running sharia compliance gate...")
-    compliance = batch_check(all_tickers)
+    # ── Step 2: Sharia gate via Claude ───────────────────────────────────────
+    print("Running Claude sharia compliance gate...")
+    compliance = bulk_screen(all_tickers)
 
     confirmed_compliant = [t for t, s in compliance.items() if s == "compliant"]
-    needs_secondary = [t for t, s in compliance.items() if s in ("borderline", "not_found")]
+    needs_review = [t for t, s in compliance.items() if s == "needs_review"]
     excluded = [t for t, s in compliance.items() if s == "non_compliant"]
 
-    print(f"  Compliant: {len(confirmed_compliant)} | Secondary check: {len(needs_secondary)} | Excluded: {len(excluded)}")
+    print(f"  Compliant: {len(confirmed_compliant)} | Needs review: {len(needs_review)} | Excluded: {len(excluded)}")
 
-    # For secondary-check tickers, they'll go through Claude's analyst with sharia_status marked
+    # needs_review tickers proceed with sharia_status flagged so Analyst does deep check
     candidate_pool = [
         (t, "compliant") for t in confirmed_compliant
     ] + [
-        (t, compliance[t]) for t in needs_secondary
+        (t, "needs_review") for t in needs_review
     ]
 
     # ── Step 3: Quick momentum screen — pick top 35 for deep research ─────────

@@ -28,14 +28,22 @@ entertainment, and pork-related businesses are excluded before scoring begins.
 ─────────────────────────────────────────────────────────────────────────────
 SHARIA COMPLIANCE
 ─────────────────────────────────────────────────────────────────────────────
-Every stock passes a two-layer gate before entering the watchlist:
+Every stock passes a two-layer Claude gate before entering the watchlist:
 
-1. Zoya API (primary) — checks AAOIFI compliance standards
-2. Claude secondary check — applied to borderline or not-found tickers,
-   using AAOIFI financial ratio tests:
+1. Bulk screen (pre-market) — Claude classifies all ~200 universe tickers
+   by primary business activity using AAOIFI criteria:
+   - non_compliant: conventional banks, alcohol, tobacco, weapons, adult
+     entertainment, pork production → permanently excluded
+   - compliant: tech, healthcare, consumer goods (halal), industrials
+     (non-weapons), energy, payment networks → proceed
+   - needs_review: mixed or uncertain → passed to deep check
+
+2. Deep check (Analyst phase) — needs_review tickers that reach the top-35
+   research candidates are re-evaluated by the Analyst using the full
+   Perplexity dossier and AAOIFI financial ratio tests:
    - Interest-bearing debt < 33% of market cap
    - Interest income < 5% of total revenue
-   - Business activity must be halal
+   - Primary business activity must be halal
 
 A stock that fails either gate is permanently excluded for that session.
 
