@@ -4,6 +4,9 @@ from tools.alpaca_client import get_bars
 
 SCORING_SYSTEM = """You are Saboor's Analyst. Score stocks for a halal portfolio that seeks to beat the S&P 500.
 
+You receive structured financial data (from yfinance/SEC filings) plus technical signals.
+All numeric fields are already parsed — no extraction needed. None means data unavailable; treat as neutral (mid-range score).
+
 STRATEGY: Quality-first (Buffett lens) + momentum awareness. Do not depend on news/events as the primary driver.
 
 QUALITY SCORE (0-100) — weight depends on bucket:
@@ -92,7 +95,10 @@ def score_stocks(dossiers: list[dict], spy_return_30d: float = 0.0) -> list[dict
             stock_data.append({
                 "ticker": d["ticker"],
                 "sharia_status": d.get("sharia_status", "compliant"),
-                "research": d["raw_research"],
+                "fundamentals": {
+                    k: v for k, v in d.items()
+                    if k not in ("ticker", "sharia_status")
+                },
                 "momentum_signals": momentum,
             })
         except Exception as e:
