@@ -1,0 +1,114 @@
+SABOOR — TRADING STRATEGY
+=========================
+
+Goal: Beat the S&P 500 (SPY) over time through disciplined, halal investing.
+
+─────────────────────────────────────────────────────────────────────────────
+THE THESIS
+─────────────────────────────────────────────────────────────────────────────
+Saboor thinks like Warren Buffett but moves with purpose.
+
+The primary lens is quality: strong revenue growth, wide moats, healthy
+balance sheets, positive free cash flow. These are businesses worth owning —
+not just trading. The secondary lens is momentum: timing matters, and a stock
+with both a strong fundamental case AND a strong technical setup is the ideal
+entry.
+
+News and events are noted but never the primary driver. Saboor does not chase
+headlines. It buys quality on good setups and holds until the thesis breaks.
+
+─────────────────────────────────────────────────────────────────────────────
+INVESTABLE UNIVERSE
+─────────────────────────────────────────────────────────────────────────────
+S&P 500 + NASDAQ 100 (~200 tickers after sharia screening).
+
+Conventional banks, insurance, alcohol, tobacco, weapons manufacturers, adult
+entertainment, and pork-related businesses are excluded before scoring begins.
+
+─────────────────────────────────────────────────────────────────────────────
+SHARIA COMPLIANCE
+─────────────────────────────────────────────────────────────────────────────
+Every stock passes a two-layer gate before entering the watchlist:
+
+1. Zoya API (primary) — checks AAOIFI compliance standards
+2. Claude secondary check — applied to borderline or not-found tickers,
+   using AAOIFI financial ratio tests:
+   - Interest-bearing debt < 33% of market cap
+   - Interest income < 5% of total revenue
+   - Business activity must be halal
+
+A stock that fails either gate is permanently excluded for that session.
+
+─────────────────────────────────────────────────────────────────────────────
+SCORING MODEL
+─────────────────────────────────────────────────────────────────────────────
+Every candidate receives two sub-scores (0-100 each):
+
+QUALITY SCORE (Buffett lens):
+  Revenue growth YoY   >20% = 25 | 10-20% = 15 | <10% = 5
+  Gross margin         >50% = 20 | 30-50% = 12 | <30% = 5
+  Return on Equity     >20% = 20 | 10-20% = 12 | <10% = 5
+  Debt / Equity        <0.3 = 20 | 0.3-1.0= 12 | >1.0 = 5
+  Free Cash Flow       positive  = 10 | negative = 0
+  PEG ratio            <1.5 = 5  | 1.5-2.5= 3  | >2.5 = 0
+
+MOMENTUM SCORE (technical setup):
+  Price above 50-day MA    yes = 25 | no = 0
+  Price above 200-day MA   yes = 25 | no = 0
+  RSI (14-day)             40-65 = 25 | 65-70 = 15 | outside = 0
+  Volume vs 20-day avg     above  = 15 | below  = 0
+  30-day return vs SPY     outperforming = 10 | underperforming = 0
+
+─────────────────────────────────────────────────────────────────────────────
+TWO-BUCKET POSITION MODEL
+─────────────────────────────────────────────────────────────────────────────
+CORE BUCKET (max 5 positions):
+  Entry threshold:  combined_score >= 65, quality_score >= 60
+  Combined formula: quality * 0.60 + momentum * 0.40
+  Hold logic:       Hold until thesis breaks (revenue miss, margin collapse,
+                    significant debt increase, management change)
+  Never exit:       On intraday noise or short-term price movement
+
+TACTICAL BUCKET (max 2 positions):
+  Entry threshold:  combined_score >= 60, momentum_score >= 65
+  Combined formula: quality * 0.30 + momentum * 0.70
+  Hold logic:       Hold while momentum is intact and Analyst rates it positive
+  Max hold:         3 trading days — must reclassify as Core or close
+  Auto-close:       EOD if Analyst downgrades OR -3% intraday stop hit
+
+─────────────────────────────────────────────────────────────────────────────
+DAILY PHASES
+─────────────────────────────────────────────────────────────────────────────
+7:30 AM  PRE-MARKET   Researcher + Analyst build the day's watchlist
+9:35 AM  MARKET OPEN  Trader + Risk Guardian execute initial positions
+12:00 PM MIDDAY       Analyst + Risk Guardian reassess; close stops/max-day holds
+3:30 PM  EOD          Risk Guardian closes remaining tactical positions
+                      Notifier sends EOD report via Telegram
+
+─────────────────────────────────────────────────────────────────────────────
+GUARDRAILS — NEVER VIOLATED
+─────────────────────────────────────────────────────────────────────────────
+1. Max 13% of portfolio in any single position
+2. Daily loss cap: if portfolio falls 2% in a day, ALL new trading halts
+   (existing Core positions are held — only new entries are blocked)
+3. Every position must pass sharia compliance before entry
+4. Maximum 7 simultaneous positions (5 Core + 2 Tactical)
+5. Tactical positions close by 3:45 PM if still open — no exceptions
+6. Tactical positions held 3+ days must be reclassified as Core or closed
+
+─────────────────────────────────────────────────────────────────────────────
+WHAT SABOOR NEVER DOES
+─────────────────────────────────────────────────────────────────────────────
+- Trade non-sharia-compliant stocks
+- Chase earnings or news events as the primary trade thesis
+- Hold a position that has broken its fundamental thesis
+- Buy a stock not on the pre-market watchlist during market hours
+- Send Telegram messages except at EOD or when something urgent happens
+- Exceed 13% position size or 2% daily loss — the code enforces these, not Claude
+
+─────────────────────────────────────────────────────────────────────────────
+BENCHMARK
+─────────────────────────────────────────────────────────────────────────────
+Daily performance is compared to SPY (S&P 500 ETF).
+Alpha (portfolio return - SPY return) is tracked daily, weekly, and
+cumulatively in the benchmark SQLite table.
