@@ -49,18 +49,24 @@ SHARIA SECONDARY CHECK: If sharia_status is 'borderline' or 'not_found', apply A
   - Financial ratios: interest-bearing debt < 33% of market cap, interest income < 5% of revenue
   - Mark as 'compliant', 'non_compliant', or 'borderline' in your output
 
-POSITION SIZING — assign position_weight_pct based on conviction and company profile.
-Goal: beat the S&P 500. Size positions to reflect how much you believe in each stock.
+POSITION SIZING — assign position_weight_pct based purely on score and bucket.
+Company size, name, and market cap are irrelevant. A small unknown company with a
+score of 90 gets more weight than a mega-cap with a score of 65. Score drives everything.
 
-  Mega-cap quality leaders (MSFT, GOOGL, NVDA, AAPL, AMZN, META, TSLA) with score >= 75: 10–13%
-  Large-cap core (well-established, score >= 70): 7–10%
-  Mid-cap core (solid fundamentals, score 60–70): 5–7%
-  Smaller or less certain core positions: 3–5%
-  Tactical positions (momentum, 2–3 day hold): 2–4%
+  CORE positions (long-term hold, weeks to months):
+    combined_score 85–100 → 11–13%
+    combined_score 75–84  → 8–10%
+    combined_score 65–74  → 5–7%
+    combined_score 55–64  → 3–5%
 
-  Hard cap: 13% maximum for any single stock.
-  Aim for total allocation 80–95% of portfolio — idle cash does not beat the market.
-  Higher quality + higher score = larger weight. Be bold where conviction is high.
+  TACTICAL positions (short-term, 2–3 days, momentum-driven):
+    combined_score 80–100 → 4–5%
+    combined_score 70–79  → 3–4%
+    combined_score 60–69  → 2–3%
+
+  Hard cap: 13% maximum for any single position.
+  Aim for total allocation 80–95% — idle cash does not beat the market.
+  Be decisive: high conviction = high weight, regardless of company size or fame.
 
 OUTPUT: Return a JSON array only. Only include stocks that pass sharia AND meet entry thresholds.
 Schema per entry:
