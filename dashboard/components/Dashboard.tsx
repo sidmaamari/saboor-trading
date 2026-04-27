@@ -4,13 +4,15 @@ import { useEffect, useState, useCallback } from "react";
 import StatCard from "./StatCard";
 import PerformanceChart from "./PerformanceChart";
 
-interface Position {
-  id: number;
+interface LivePosition {
   ticker: string;
-  bucket: string;
   shares: number;
   entry_price: number;
-  days_held: number;
+  current_price: number;
+  market_value: number;
+  unrealized_pl: number;
+  unrealized_plpc: number;
+  allocation_pct: number;
 }
 
 interface BenchmarkRow {
@@ -28,7 +30,7 @@ interface Portfolio {
 interface DashboardData {
   benchmark: BenchmarkRow[];
   portfolio: Portfolio | null;
-  openPositions: Position[];
+  livePositions: LivePosition[];
 }
 
 export default function Dashboard({ initial }: { initial: DashboardData }) {
@@ -49,7 +51,7 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
     return () => clearInterval(id);
   }, [refresh]);
 
-  const { benchmark, portfolio, openPositions } = data;
+  const { benchmark, portfolio, livePositions } = data;
   const latest = benchmark[benchmark.length - 1];
 
   const totalValue = portfolio?.total_value ?? 100_000;
@@ -57,6 +59,7 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
   const cumSaboor = latest?.cumulative_portfolio ?? 0;
   const cumSpy = latest?.cumulative_spy ?? 0;
   const alpha = cumSaboor - cumSpy;
+  const hasTraded = livePositions.length > 0;
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-10">
@@ -83,20 +86,21 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
         />
         <StatCard
           label="Total Return"
-          value={`${cumSaboor >= 0 ? "+" : ""}${cumSaboor.toFixed(2)}%`}
-          color={cumSaboor >= 0 ? "green" : "red"}
+          value={cumSaboor === 0 ? "0.00%" : `${cumSaboor >= 0 ? "+" : ""}${cumSaboor.toFixed(2)}%`}
+          color={cumSaboor > 0 ? "green" : cumSaboor < 0 ? "red" : "white"}
+          sub={benchmark.length === 0 ? "No trades yet" : undefined}
         />
         <StatCard
           label="Alpha vs SPY"
-          value={`${alpha >= 0 ? "+" : ""}${alpha.toFixed(2)}%`}
+          value={benchmark.length === 0 ? "—" : `${alpha >= 0 ? "+" : ""}${alpha.toFixed(2)}%`}
           sub={`SPY: ${cumSpy >= 0 ? "+" : ""}${cumSpy.toFixed(2)}%`}
-          color={alpha >= 0 ? "green" : "red"}
+          color={alpha > 0 ? "green" : alpha < 0 ? "red" : "white"}
         />
         <StatCard
           label="Daily P&L"
-          value={`${dailyPl >= 0 ? "+$" : "-$"}${Math.abs(dailyPl).toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
-          sub={`${openPositions.length} open position${openPositions.length !== 1 ? "s" : ""}`}
-          color={dailyPl >= 0 ? "green" : "red"}
+          value={dailyPl === 0 ? "$0" : `${dailyPl >= 0 ? "+$" : "-$"}${Math.abs(dailyPl).toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
+          sub={`${livePositions.length} open position${livePositions.length !== 1 ? "s" : ""}`}
+          color={dailyPl > 0 ? "green" : dailyPl < 0 ? "red" : "white"}
         />
       </div>
 
@@ -108,55 +112,89 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
         <PerformanceChart data={benchmark} />
       </div>
 
-      {/* Open Positions */}
-      {openPositions.length > 0 && (
-        <div className="bg-[#111] border border-[#222] rounded-xl p-6">
-          <h2 className="text-sm font-medium text-gray-400 mb-4">
-            Open Positions
-          </h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-600 uppercase border-b border-[#1f1f1f]">
-                <th className="text-left pb-2 font-medium">Ticker</th>
-                <th className="text-left pb-2 font-medium">Bucket</th>
-                <th className="text-right pb-2 font-medium">Shares</th>
-                <th className="text-right pb-2 font-medium">Entry</th>
-                <th className="text-right pb-2 font-medium">Days</th>
-              </tr>
-            </thead>
-            <tbody>
-              {openPositions.map((pos) => (
-                <tr
-                  key={pos.id}
-                  className="border-b border-[#1a1a1a] last:border-0"
-                >
-                  <td className="py-2.5 font-medium">{pos.ticker}</td>
-                  <td className="py-2.5">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        pos.bucket === "core"
-                          ? "bg-blue-500/10 text-blue-400"
-                          : "bg-orange-500/10 text-orange-400"
-                      }`}
-                    >
-                      {pos.bucket}
-                    </span>
-                  </td>
-                  <td className="py-2.5 text-right text-gray-400">
-                    {pos.shares}
-                  </td>
-                  <td className="py-2.5 text-right text-gray-400">
-                    ${pos.entry_price?.toFixed(2)}
-                  </td>
-                  <td className="py-2.5 text-right text-gray-400">
-                    {pos.days_held ?? 0}d
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Portfolio Breakdown */}
+      <div className="bg-[#111] border border-[#222] rounded-xl p-6">
+        <h2 className="text-sm font-medium text-gray-400 mb-4">Portfolio</h2>
+
+        {/* Cash row always visible */}
+        <div className="flex items-center justify-between py-3 border-b border-[#1a1a1a]">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-gray-600" />
+            <span className="text-sm font-medium">Cash</span>
+          </div>
+          <div className="flex items-center gap-8">
+            <span className="text-sm text-gray-400 w-20 text-right">
+              ${(portfolio?.cash ?? totalValue).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            </span>
+            <span className="text-sm text-gray-500 w-14 text-right">
+              {(((portfolio?.cash ?? totalValue) / totalValue) * 100).toFixed(1)}%
+            </span>
+          </div>
         </div>
-      )}
+
+        {!hasTraded ? (
+          <p className="text-xs text-gray-600 text-center py-6">
+            No open positions — first trades execute at market open.
+          </p>
+        ) : (
+          livePositions.map((pos) => {
+            const isCore = pos.unrealized_plpc !== undefined;
+            return (
+              <div
+                key={pos.ticker}
+                className="flex items-center justify-between py-3 border-b border-[#1a1a1a] last:border-0"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <div>
+                    <span className="text-sm font-medium">{pos.ticker}</span>
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-500">
+                      {pos.shares} shares
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-8">
+                  <span className="text-sm text-gray-400 w-24 text-right">
+                    ${pos.market_value.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                  </span>
+                  <span
+                    className={`text-sm w-20 text-right font-medium ${
+                      pos.unrealized_plpc >= 0 ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    {pos.unrealized_plpc >= 0 ? "+" : ""}
+                    {pos.unrealized_plpc.toFixed(2)}%
+                  </span>
+                  <span className="text-sm text-gray-500 w-14 text-right">
+                    {pos.allocation_pct.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {/* Total row */}
+        {hasTraded && (
+          <div className="flex items-center justify-between pt-4 mt-1">
+            <span className="text-xs text-gray-600 uppercase tracking-widest">Total</span>
+            <div className="flex items-center gap-8">
+              <span className="text-sm font-medium w-24 text-right">
+                ${totalValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+              </span>
+              <span
+                className={`text-sm font-medium w-20 text-right ${
+                  dailyPl >= 0 ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {dailyPl >= 0 ? "+$" : "-$"}
+                {Math.abs(dailyPl).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-sm text-gray-500 w-14 text-right">100%</span>
+            </div>
+          </div>
+        )}
+      </div>
     </main>
   );
 }

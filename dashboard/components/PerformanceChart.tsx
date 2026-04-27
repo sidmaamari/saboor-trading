@@ -27,14 +27,18 @@ export default function PerformanceChart({ data }: { data: BenchmarkRow[] }) {
     );
   }
 
-  const chartData = data.map((d) => ({
-    date: new Date(d.date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    }),
-    Saboor: parseFloat(d.cumulative_portfolio.toFixed(2)),
-    "S&P 500": parseFloat(d.cumulative_spy.toFixed(2)),
-  }));
+  // Always start both lines from 0%
+  const chartData = [
+    { date: "Start", Saboor: 0, "S&P 500": 0 },
+    ...data.map((d) => ({
+      date: new Date(d.date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      Saboor: parseFloat(d.cumulative_portfolio.toFixed(2)),
+      "S&P 500": parseFloat(d.cumulative_spy.toFixed(2)),
+    })),
+  ];
 
   return (
     <ResponsiveContainer width="100%" height={320}>
@@ -66,9 +70,7 @@ export default function PerformanceChart({ data }: { data: BenchmarkRow[] }) {
             name,
           ]}
         />
-        <Legend
-          wrapperStyle={{ paddingTop: 16, fontSize: 12, color: "#6b7280" }}
-        />
+        <Legend wrapperStyle={{ paddingTop: 16, fontSize: 12, color: "#6b7280" }} />
         <Line
           type="monotone"
           dataKey="Saboor"
