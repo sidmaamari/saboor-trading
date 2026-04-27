@@ -58,7 +58,6 @@ def save_position(
     momentum_score: float = None,
     combined_score: float = None,
 ):
-    stop_loss = entry_price * 0.97
     get_client().table("positions").insert({
         "ticker": ticker,
         "bucket": bucket,
@@ -69,7 +68,6 @@ def save_position(
         "quality_score": quality_score,
         "momentum_score": momentum_score,
         "combined_score": combined_score,
-        "stop_loss": stop_loss,
         "status": "open",
     }).execute()
 

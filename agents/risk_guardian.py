@@ -5,7 +5,6 @@ MAX_POSITION_PCT = 0.13       # hard cap — no single position exceeds 13%
 DAILY_LOSS_CAP_PCT = 0.02     # 2% daily loss halts all trading
 MAX_CORE_POSITIONS = 8
 MAX_TACTICAL_POSITIONS = 4
-TACTICAL_INTRADAY_STOP = -0.03  # -3% stop loss
 TACTICAL_MAX_DAYS = 3
 
 RSI_BLOCK_THRESHOLD = 78       # don't buy overbought stocks
@@ -109,9 +108,8 @@ def max_shares_for_position(price: float, position_weight_pct: float = None) -> 
 
 def get_tactical_positions_to_close() -> list[str]:
     """
-    Returns tickers of tactical positions that must be closed:
-    - Hit the -3% intraday stop, OR
-    - Held for 3+ trading days without being reclassified as core
+    Returns tickers of tactical positions to close: held for 3+ trading days.
+    Price drops alone are never a reason to close — only a broken thesis is.
     """
     from db.queries import get_open_positions
 
@@ -119,12 +117,7 @@ def get_tactical_positions_to_close() -> list[str]:
     to_close = []
 
     for p in positions:
-        current = p.get("current_price") or p["entry_price"]
-        pnl_pct = (current - p["entry_price"]) / p["entry_price"]
-
-        if pnl_pct <= TACTICAL_INTRADAY_STOP:
-            to_close.append((p["ticker"], "-3% stop hit"))
-        elif p["days_held"] >= TACTICAL_MAX_DAYS:
+        if p["days_held"] >= TACTICAL_MAX_DAYS:
             to_close.append((p["ticker"], f"max hold ({TACTICAL_MAX_DAYS} days) reached"))
 
     return to_close

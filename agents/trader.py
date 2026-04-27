@@ -16,15 +16,15 @@ BUYING APPROACH — build a diversified portfolio:
 - Add TACTICAL positions only when momentum is exceptionally strong
 - Deploy capital fully — idle cash does not beat the market
 
-HOLDING APPROACH — stability is a feature, not a bug:
-- Do NOT sell a CORE position unless: stop-loss is hit, or the fundamental thesis is clearly broken
-- A stock being down 1-2% is NOT a reason to sell — that is normal noise
-- A stock being up is NOT a reason to sell core — let winners run
-- Only recommend SELL for core when earnings disappoint, sector disrupts, or stop is breached
+HOLDING APPROACH — patience is the edge:
+- NEVER sell because a price dropped. A stock down 5%, 10%, even 15% is noise if the thesis is intact.
+- The only valid reason to sell is a broken thesis: earnings collapse, business model disruption, or sector destruction.
+- A stock being up is NOT a reason to sell core — let winners run.
+- Conviction in the original thesis > short-term price anxiety.
 
 SELLING:
-- Tactical: handled automatically by midday/EOD (3-day max, -3% stop)
-- Core: hold through volatility, exit only on fundamental change
+- Tactical: handled automatically at EOD (3-day max hold). Do not sell tactical intraday on price alone.
+- Core: hold through all volatility. Exit only when the fundamental reason you bought it no longer exists.
 
 OUTPUT: JSON only.
 {
