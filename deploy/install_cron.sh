@@ -4,7 +4,7 @@
 # Usage: bash install_cron.sh
 
 INSTALL_DIR="/opt/saboor"
-PYTHON="/usr/bin/python3"
+PYTHON="$INSTALL_DIR/venv/bin/python3"
 LOG="$INSTALL_DIR/logs"
 
 # Remove any existing Saboor cron entries, then add fresh ones

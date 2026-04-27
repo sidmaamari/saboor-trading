@@ -6,5 +6,5 @@
 set -e
 cd /opt/saboor
 git pull origin main
-pip3 install -r requirements.txt --quiet
+venv/bin/pip install -r requirements.txt --quiet
 echo "Update complete."

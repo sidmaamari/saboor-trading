@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time setup for Saboor on a DigitalOcean Ubuntu 22.04 droplet.
+# One-time setup for Saboor on a DigitalOcean Ubuntu droplet.
 # Run as root after SSH-ing in for the first time.
 # Usage: bash setup.sh
 
@@ -7,17 +7,22 @@ set -e
 
 REPO="https://github.com/sidmaamari/saboor-trading.git"
 INSTALL_DIR="/opt/saboor"
+VENV="$INSTALL_DIR/venv"
 
 echo "=== Installing system dependencies ==="
 apt-get update -qq
-apt-get install -y python3 python3-pip git cron
+apt-get install -y python3 python3-venv python3-full git cron
 
 echo "=== Cloning repo ==="
 git clone "$REPO" "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
+echo "=== Creating virtual environment ==="
+python3 -m venv "$VENV"
+
 echo "=== Installing Python packages ==="
-pip3 install -r requirements.txt
+"$VENV/bin/pip" install --upgrade pip --quiet
+"$VENV/bin/pip" install -r requirements.txt --quiet
 
 echo "=== Creating logs directory ==="
 mkdir -p "$INSTALL_DIR/logs"
