@@ -2,7 +2,8 @@ import os
 import requests
 from datetime import date, timedelta
 
-BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+_raw_url = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets").rstrip("/")
+BASE_URL = _raw_url[:-3] if _raw_url.endswith("/v2") else _raw_url
 DATA_URL = "https://data.alpaca.markets"
 
 
