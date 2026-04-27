@@ -7,6 +7,7 @@ from tools.alpaca_client import get_bars, get_price
 from tools.sharia_screener import bulk_screen
 from agents.researcher import build_dossiers
 from agents.analyst import score_stocks, _calculate_momentum
+from agents.notifier import send_premarket_report
 from db.queries import save_watchlist, log_decision, update_positions_days_held
 from data.universe import get_universe
 
@@ -84,8 +85,11 @@ def run():
     print("\nScoring candidates via Claude Analyst...")
     scored = score_stocks(dossiers, spy_return_30d=spy_30d)
 
+    excluded_count = len([t for t, _, _ in top_candidates]) - len(scored)
+
     if not scored:
         log_decision("premarket", None, "no_candidates", "No stocks passed scoring thresholds")
+        send_premarket_report([], excluded_count)
         print("No stocks passed thresholds — watchlist empty for today.")
         return []
 
@@ -100,6 +104,8 @@ def run():
         print(
             f"  {s['ticker']:6} | {s['combined_score']:5.1f} | {s['bucket']:8} | {s['thesis'][:60]}"
         )
+
+    send_premarket_report(watchlist, excluded_count)
 
     log_decision(
         "premarket", None, "phase_complete",

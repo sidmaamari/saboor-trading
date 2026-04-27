@@ -58,6 +58,29 @@ def send_urgent(ticker: str, trigger: str, action: str) -> None:
     )
 
 
+def send_premarket_report(watchlist: list[dict], excluded_count: int) -> None:
+    if not watchlist:
+        _send(
+            f"<b>Saboor Pre-Market</b>\n\n"
+            f"No stocks passed today's filters.\n"
+            f"{excluded_count} candidates excluded (overbought/extended).\n"
+            f"No trades will execute at open."
+        )
+        return
+
+    lines = []
+    for s in watchlist:
+        bucket_icon = "🔵" if s.get("bucket") == "core" else "🟡"
+        score = s.get("combined_score", 0)
+        lines.append(f"{bucket_icon} <b>{s['ticker']}</b> ({score:.0f}/100) — {s.get('thesis','')[:80]}")
+
+    _send(
+        f"<b>Saboor Pre-Market Watchlist</b>\n\n"
+        + "\n\n".join(lines)
+        + f"\n\n<i>{excluded_count} overbought stocks excluded today</i>"
+    )
+
+
 def send_daily_loss_cap_alert(daily_pl: float, portfolio_value: float) -> None:
     pct = abs(daily_pl / portfolio_value * 100) if portfolio_value else 0
     _send(
