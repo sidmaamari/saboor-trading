@@ -95,7 +95,7 @@ def run():
 
     # ── Step 7: Rank and save top 10 ─────────────────────────────────────────
     scored.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
-    watchlist = scored[:10]
+    watchlist = scored[:15]
 
     save_watchlist(today, watchlist)
 

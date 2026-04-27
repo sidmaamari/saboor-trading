@@ -1,10 +1,10 @@
 from tools.alpaca_client import get_bars
 from db.queries import get_portfolio_value, get_open_positions_count, get_daily_pl
 
-MAX_POSITION_PCT = 0.13       # 13% of portfolio per position
+MAX_POSITION_PCT = 0.08       # 8% of portfolio per position (allows 12 positions)
 DAILY_LOSS_CAP_PCT = 0.02     # 2% daily loss halts all trading
-MAX_CORE_POSITIONS = 5
-MAX_TACTICAL_POSITIONS = 2
+MAX_CORE_POSITIONS = 8
+MAX_TACTICAL_POSITIONS = 4
 TACTICAL_INTRADAY_STOP = -0.03  # -3% stop loss
 TACTICAL_MAX_DAYS = 3
 
