@@ -8,21 +8,34 @@ You receive structured financial data (from yfinance/SEC filings) plus technical
 All numeric fields are already parsed — no extraction needed. None means data unavailable; treat as neutral (mid-range score).
 
 STRATEGY: Quality-first (Buffett lens) + momentum awareness. Do not depend on news/events as the primary driver.
+Default to caution. Only recommend a stock if you are genuinely confident it will generate positive returns.
+A pass is better than a bad trade — missing a winner costs nothing, a bad entry loses real money.
+
+HARD EXCLUSIONS — exclude these immediately, do not score them:
+  - RSI > 78: stock is overbought, high reversal risk
+  - Price > 150% above MA200: dangerously extended, mean-reversion risk
+  - FCF negative AND PE > 150x AND ROE negative: pure speculation, no fundamental floor
+  - ma200_extension_pct field provided — use it
 
 QUALITY SCORE (0-100) — weight depends on bucket:
   Revenue growth YoY: >20%=25pts | 10-20%=15pts | <10%=5pts | negative=0pts
   Gross margin:       >50%=20pts | 30-50%=12pts  | <30%=5pts
-  ROE:                >20%=20pts | 10-20%=12pts  | <10%=5pts
+  ROE:                >20%=20pts | 10-20%=12pts  | <10%=5pts | negative=-10pts
   Debt/Equity:        <0.3=20pts | 0.3-1.0=12pts | >1.0=5pts
   FCF positive:       yes=10pts  | no=0pts
   PEG ratio:          <1.5=5pts  | 1.5-2.5=3pts  | >2.5=0pts | N/A=2pts
+  PENALTY: FCF negative + PE > 100x = subtract 10pts from quality score
 
 MOMENTUM SCORE (0-100):
   Price above 50-day MA:  yes=25pts | no=0pts
   Price above 200-day MA: yes=25pts | no=0pts
-  RSI 40-65:              yes=25pts | RSI 65-70=15pts | RSI>70 or <40=0pts
+  RSI 40-65:              25pts (ideal entry zone)
+  RSI 65-72:              15pts (getting hot — acceptable)
+  RSI 72-78:              5pts  (caution — only enter with strong quality)
+  RSI > 78 or < 38:       EXCLUDE stock entirely (see hard exclusions above)
   Volume > 20-day avg:    yes=15pts | no=0pts
   30-day return vs SPY:   outperforming=10pts | underperforming=0pts
+  PENALTY: ma200_extension_pct > 100% = subtract 10pts from momentum score
 
 BUCKET CLASSIFICATION:
   CORE:     quality_score >= 60 AND combined_score >= 65
@@ -72,6 +85,15 @@ def _calculate_momentum(ticker: str, spy_30d_return: float = 0.0) -> dict | None
 
     avg_vol_20 = sum(volumes[-20:]) / 20
     return_30d = ((closes[-1] - closes[-30]) / closes[-30] * 100) if len(closes) >= 30 else 0
+    ma200_extension_pct = round((current / ma200 - 1) * 100, 1)
+
+    # Hard pre-filter — block before Claude sees the stock
+    if rsi > 78:
+        print(f"    [{ticker}] excluded: RSI {rsi:.0f} > 78 (overbought)")
+        return None
+    if ma200_extension_pct > 150:
+        print(f"    [{ticker}] excluded: {ma200_extension_pct:.0f}% above MA200 (too extended)")
+        return None
 
     return {
         "current_price": round(current, 2),
@@ -81,6 +103,7 @@ def _calculate_momentum(ticker: str, spy_30d_return: float = 0.0) -> dict | None
         "volume_vs_20d_avg": round(volumes[-1] / avg_vol_20, 2),
         "return_30d_pct": round(return_30d, 2),
         "outperforming_spy": return_30d > spy_30d_return,
+        "ma200_extension_pct": ma200_extension_pct,
     }
 
 

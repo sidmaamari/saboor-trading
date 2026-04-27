@@ -1,3 +1,4 @@
+from tools.alpaca_client import get_bars
 from db.queries import get_portfolio_value, get_open_positions_count, get_daily_pl
 
 MAX_POSITION_PCT = 0.13       # 13% of portfolio per position
@@ -6,6 +7,36 @@ MAX_CORE_POSITIONS = 5
 MAX_TACTICAL_POSITIONS = 2
 TACTICAL_INTRADAY_STOP = -0.03  # -3% stop loss
 TACTICAL_MAX_DAYS = 3
+
+RSI_BLOCK_THRESHOLD = 78       # don't buy overbought stocks
+MA200_EXTENSION_BLOCK = 1.5    # don't buy >150% above MA200
+
+
+def _live_entry_check(ticker: str) -> tuple[bool, str]:
+    """Re-checks RSI and MA200 extension at order time using fresh bars."""
+    try:
+        bars = get_bars(ticker, days=210)
+        if len(bars) < 55:
+            return True, "ok"
+        closes = [b["close"] for b in bars]
+        current = closes[-1]
+        ma200 = sum(closes[-200:]) / 200 if len(closes) >= 200 else sum(closes) / len(closes)
+
+        deltas = [closes[-i] - closes[-i - 1] for i in range(1, 15)]
+        gains = [d for d in deltas if d > 0]
+        losses = [abs(d) for d in deltas if d < 0]
+        avg_gain = sum(gains) / 14
+        avg_loss = sum(losses) / 14 if losses else 0.001
+        rsi = 100 - (100 / (1 + avg_gain / avg_loss))
+
+        if rsi > RSI_BLOCK_THRESHOLD:
+            return False, f"RSI {rsi:.0f} > {RSI_BLOCK_THRESHOLD} at order time — overbought, skipping"
+        if current > ma200 * (1 + MA200_EXTENSION_BLOCK):
+            ext = (current / ma200 - 1) * 100
+            return False, f"Price {ext:.0f}% above MA200 at order time — too extended, skipping"
+        return True, "ok"
+    except Exception:
+        return True, "ok"  # don't block on data errors
 
 
 def validate_order(
@@ -18,6 +49,11 @@ def validate_order(
     """
     if side == "sell":
         return True, "sell approved"
+
+    # Live entry quality check — re-run at order time, not just at premarket scoring
+    ok, reason = _live_entry_check(ticker)
+    if not ok:
+        return False, reason
 
     portfolio = get_portfolio_value()
     total_value = portfolio["total_value"]
