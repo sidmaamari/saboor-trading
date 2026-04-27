@@ -39,13 +39,19 @@ def execute_trades(watchlist: list[dict], open_positions: list[dict]) -> dict:
     Ask Claude to make decisions, then execute approved orders through Risk Guardian → Alpaca.
     Returns counts of executed buys and sells.
     """
-    # Enrich watchlist with live price and approved share quantity
+    # Enrich watchlist with live price and analyst-weighted share quantity
     enriched_watchlist = []
     for item in watchlist:
         try:
             price = get_price(item["ticker"])
-            max_shares = max_shares_for_position(price)
-            enriched_watchlist.append({**item, "current_price": price, "max_shares": max_shares})
+            weight = item.get("position_weight_pct")
+            max_shares = max_shares_for_position(price, weight)
+            enriched_watchlist.append({
+                **item,
+                "current_price": price,
+                "max_shares": max_shares,
+                "target_allocation_pct": weight or 8,
+            })
         except Exception as e:
             print(f"  Price fetch failed for {item['ticker']}: {e}")
 
@@ -75,7 +81,8 @@ def execute_trades(watchlist: list[dict], open_positions: list[dict]) -> dict:
 
         try:
             price = get_price(ticker)
-            approved, reason = validate_order(ticker, "buy", shares, price, bucket)
+            weight = next((w.get("position_weight_pct") for w in enriched_watchlist if w["ticker"] == ticker), None)
+            approved, reason = validate_order(ticker, "buy", shares, price, bucket, weight)
 
             if not approved:
                 log_decision("market_open", ticker, "buy_rejected", reason)

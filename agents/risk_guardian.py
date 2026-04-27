@@ -1,7 +1,7 @@
 from tools.alpaca_client import get_bars
 from db.queries import get_portfolio_value, get_open_positions_count, get_daily_pl
 
-MAX_POSITION_PCT = 0.08       # 8% of portfolio per position (allows 12 positions)
+MAX_POSITION_PCT = 0.13       # hard cap — no single position exceeds 13%
 DAILY_LOSS_CAP_PCT = 0.02     # 2% daily loss halts all trading
 MAX_CORE_POSITIONS = 8
 MAX_TACTICAL_POSITIONS = 4
@@ -40,7 +40,8 @@ def _live_entry_check(ticker: str) -> tuple[bool, str]:
 
 
 def validate_order(
-    ticker: str, side: str, shares: float, price: float, bucket: str
+    ticker: str, side: str, shares: float, price: float, bucket: str,
+    position_weight_pct: float = None,
 ) -> tuple[bool, str]:
     """
     Final gate before any buy order touches Alpaca.
@@ -61,13 +62,14 @@ def validate_order(
     if total_value <= 0:
         return False, "Portfolio value unavailable"
 
-    # Position size
+    # Position size — use analyst weight if provided, else fall back to hard cap
     order_value = shares * price
-    max_allowed = total_value * MAX_POSITION_PCT
+    target_pct = min((position_weight_pct or 100) / 100, MAX_POSITION_PCT)
+    max_allowed = total_value * target_pct
     if order_value > max_allowed:
         max_shares = int(max_allowed / price)
         return False, (
-            f"Order value ${order_value:,.0f} exceeds 13% cap "
+            f"Order ${order_value:,.0f} exceeds {target_pct*100:.0f}% target "
             f"(${max_allowed:,.0f}). Resize to {max_shares} shares."
         )
 
@@ -95,13 +97,14 @@ def is_daily_loss_cap_hit() -> bool:
     return get_daily_pl() <= -(total_value * DAILY_LOSS_CAP_PCT)
 
 
-def max_shares_for_position(price: float) -> int:
-    """Maximum shares allowed for a new position at the given price."""
+def max_shares_for_position(price: float, position_weight_pct: float = None) -> int:
+    """Shares for a position sized by analyst weight (capped at 13%)."""
     portfolio = get_portfolio_value()
     total_value = portfolio["total_value"]
     if price <= 0 or total_value <= 0:
         return 0
-    return int((total_value * MAX_POSITION_PCT) / price)
+    target_pct = min((position_weight_pct or 100) / 100, MAX_POSITION_PCT)
+    return int((total_value * target_pct) / price)
 
 
 def get_tactical_positions_to_close() -> list[str]:

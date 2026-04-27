@@ -143,6 +143,7 @@ def save_watchlist(trading_date: date, items: list[dict]):
             "momentum_score": item.get("momentum_score", 0),
             "combined_score": item.get("combined_score", 0),
             "bucket": item.get("bucket", "tactical"),
+            "position_weight_pct": item.get("position_weight_pct", 8),
             "thesis": item.get("thesis", ""),
             "key_risks": item.get("key_risks", ""),
             "sharia_status": item.get("sharia_status", "compliant"),

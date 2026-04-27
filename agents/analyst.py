@@ -49,6 +49,19 @@ SHARIA SECONDARY CHECK: If sharia_status is 'borderline' or 'not_found', apply A
   - Financial ratios: interest-bearing debt < 33% of market cap, interest income < 5% of revenue
   - Mark as 'compliant', 'non_compliant', or 'borderline' in your output
 
+POSITION SIZING — assign position_weight_pct based on conviction and company profile.
+Goal: beat the S&P 500. Size positions to reflect how much you believe in each stock.
+
+  Mega-cap quality leaders (MSFT, GOOGL, NVDA, AAPL, AMZN, META, TSLA) with score >= 75: 10–13%
+  Large-cap core (well-established, score >= 70): 7–10%
+  Mid-cap core (solid fundamentals, score 60–70): 5–7%
+  Smaller or less certain core positions: 3–5%
+  Tactical positions (momentum, 2–3 day hold): 2–4%
+
+  Hard cap: 13% maximum for any single stock.
+  Aim for total allocation 80–95% of portfolio — idle cash does not beat the market.
+  Higher quality + higher score = larger weight. Be bold where conviction is high.
+
 OUTPUT: Return a JSON array only. Only include stocks that pass sharia AND meet entry thresholds.
 Schema per entry:
 {
@@ -57,6 +70,7 @@ Schema per entry:
   "momentum_score": number,
   "combined_score": number,
   "bucket": "core" | "tactical",
+  "position_weight_pct": number,
   "thesis": "1-2 sentences on why this is a good trade today",
   "key_risks": "1 sentence on the main risk",
   "sharia_status": "compliant" | "non_compliant" | "borderline"
