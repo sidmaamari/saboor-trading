@@ -1,6 +1,7 @@
 import json
 from tools.claude_client import complete
 from tools.alpaca_client import get_bars
+from tools.technical import calculate_signals
 
 SCORING_SYSTEM = """You are Saboor's Analyst. Score stocks for a halal portfolio that seeks to beat the S&P 500.
 
@@ -84,28 +85,24 @@ Schema per entry:
 
 
 def _calculate_momentum(ticker: str, spy_30d_return: float = 0.0) -> dict | None:
+    # FIX [HIGH H-12]: Delegate RSI/MA math to the shared calculator.
+    # REASON: Eliminates duplicate code that previously diverged between
+    #         this file and risk_guardian.py.
+    # SOLUTION: tools.technical.calculate_signals is the single source of truth.
     bars = get_bars(ticker, days=210)
     if len(bars) < 55:
         return None
 
     closes = [b["close"] for b in bars]
     volumes = [b["volume"] for b in bars]
-    current = closes[-1]
 
-    ma50 = sum(closes[-50:]) / 50
-    ma200 = sum(closes[-200:]) / 200 if len(closes) >= 200 else sum(closes) / len(closes)
+    signals = calculate_signals(closes, volumes)
+    rsi = signals["rsi"]
+    current = signals["current"]
+    ma200_extension_pct = signals["ma200_extension_pct"]
+    avg_vol_20 = signals["avg_vol_20"]
 
-    # RSI-14 (simple)
-    deltas = [closes[-i] - closes[-i - 1] for i in range(1, 15)]
-    gains = [d for d in deltas if d > 0]
-    losses = [abs(d) for d in deltas if d < 0]
-    avg_gain = sum(gains) / 14
-    avg_loss = sum(losses) / 14 if losses else 0.001
-    rsi = 100 - (100 / (1 + avg_gain / avg_loss))
-
-    avg_vol_20 = sum(volumes[-20:]) / 20
     return_30d = ((closes[-1] - closes[-30]) / closes[-30] * 100) if len(closes) >= 30 else 0
-    ma200_extension_pct = round((current / ma200 - 1) * 100, 1)
 
     # Hard pre-filter — block before Claude sees the stock
     if rsi > 78:
@@ -115,12 +112,14 @@ def _calculate_momentum(ticker: str, spy_30d_return: float = 0.0) -> dict | None
         print(f"    [{ticker}] excluded: {ma200_extension_pct:.0f}% above MA200 (too extended)")
         return None
 
+    volume_ratio = round(volumes[-1] / avg_vol_20, 2) if avg_vol_20 > 0 else 0.0
+
     return {
         "current_price": round(current, 2),
-        "above_ma50": current > ma50,
-        "above_ma200": current > ma200,
-        "rsi": round(rsi, 1),
-        "volume_vs_20d_avg": round(volumes[-1] / avg_vol_20, 2),
+        "above_ma50": signals["above_ma50"],
+        "above_ma200": signals["above_ma200"],
+        "rsi": rsi,
+        "volume_vs_20d_avg": volume_ratio,
         "return_30d_pct": round(return_30d, 2),
         "outperforming_spy": return_30d > spy_30d_return,
         "ma200_extension_pct": ma200_extension_pct,

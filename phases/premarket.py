@@ -63,8 +63,8 @@ def run():
     research_tickers = [(t, s) for t, s, _ in top_candidates]
     print(f"  Top {len(research_tickers)} candidates selected for deep research")
 
-    # ── Step 4: Perplexity dossiers ───────────────────────────────────────────
-    print("\nBuilding research dossiers via Perplexity...")
+    # ── Step 4: yfinance dossiers ─────────────────────────────────────────────
+    print("\nBuilding research dossiers via yfinance...")
     ticker_list = [t for t, _ in research_tickers]
     sharia_map = {t: s for t, s in research_tickers}
     dossiers = build_dossiers(ticker_list)

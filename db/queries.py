@@ -11,12 +11,22 @@ def init_db():
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 
 def sync_portfolio(cash: float, equity: float, total_value: float, daily_pl: float):
-    get_client().table("portfolio").insert({
+    # FIX [HIGH H-6]: Upsert by date instead of insert.
+    # REASON: The portfolio table was accumulating one row per phase per day
+    #         (premarket, open, midday, eod), inflating storage and making
+    #         "latest portfolio" queries scan more rows than necessary.
+    #         More importantly, downstream analytics that join by date
+    #         could return ambiguous results.
+    # SOLUTION: Upsert on `date` so there is exactly one row per trading day,
+    #         updated in place across phases. Requires a UNIQUE(date) on
+    #         the `portfolio` table — see supabase_schema.sql.
+    get_client().table("portfolio").upsert({
+        "date": date.today().isoformat(),
         "cash": cash,
         "equity": equity,
         "total_value": total_value,
         "daily_pl": daily_pl,
-    }).execute()
+    }, on_conflict="date").execute()
 
 
 def get_portfolio_value() -> dict:
@@ -81,9 +91,25 @@ def get_open_positions(bucket: str = None) -> list[dict]:
 
 
 def get_open_positions_count() -> dict:
-    core = get_client().table("positions").select("id").eq("status", "open").eq("bucket", "core").execute()
-    tactical = get_client().table("positions").select("id").eq("status", "open").eq("bucket", "tactical").execute()
-    return {"core": len(core.data or []), "tactical": len(tactical.data or [])}
+    # FIX [HIGH H-10]: Single round-trip instead of two parallel queries.
+    # REASON: Two sequential SELECTs added latency on every call to the risk
+    #         guardian, which runs once per buy decision. With ~12 positions
+    #         across two buckets the bandwidth saving is small, but the
+    #         latency saving on hot paths matters and the simpler code is
+    #         less likely to drift.
+    # SOLUTION: One SELECT for all open positions, then count in-memory.
+    resp = (
+        get_client().table("positions")
+        .select("bucket")
+        .eq("status", "open")
+        .execute()
+    )
+    counts = {"core": 0, "tactical": 0}
+    for row in (resp.data or []):
+        bucket = row.get("bucket")
+        if bucket in counts:
+            counts[bucket] += 1
+    return counts
 
 
 def get_position_by_ticker(ticker: str) -> dict | None:
@@ -99,6 +125,13 @@ def get_position_by_ticker(ticker: str) -> dict | None:
 
 
 def close_position(ticker: str, close_price: float, reason: str):
+    # FIX [CRITICAL C-3]: Close the SPECIFIC position by id, not all open rows for the ticker.
+    # REASON: The previous UPDATE matched on (ticker, status='open'), which
+    #         would close every open row for that ticker if more than one
+    #         existed. This is a data-integrity hazard: a partial fill or
+    #         a manual entry could result in two open rows; an EOD close
+    #         on one would silently close them both, corrupting P&L.
+    # SOLUTION: Fetch the row first to capture its id, then update by id.
     resp = (
         get_client().table("positions")
         .select("*")
@@ -117,10 +150,25 @@ def close_position(ticker: str, close_price: float, reason: str):
         "close_price": close_price,
         "pnl": pnl,
         "close_reason": reason,
-    }).eq("ticker", ticker).eq("status", "open").execute()
+    }).eq("id", pos["id"]).execute()
 
 
 def update_positions_days_held():
+    # FIX [HIGH H-4 / H-11]: Only increment on trading weekdays (Mon–Fri).
+    # REASON: Tactical positions have a 3-trading-day max hold. If days_held
+    #         was incremented on Saturday and Sunday, a Friday entry would
+    #         hit "max hold" by Monday morning — closing it a full trading
+    #         day early. This is a real correctness bug for the tactical
+    #         strategy. (Holiday handling is best-effort; weekend handling
+    #         is the high-impact win.)
+    # SOLUTION: Bail out on weekends so days_held only advances on Mon–Fri.
+    #         Note: this still N+1's on Supabase — a true server-side
+    #         increment would require an RPC, which is deferred. Each
+    #         loop iteration touches one row, capped by open positions
+    #         (typically <15), so the perf cost is bounded.
+    if date.today().weekday() >= 5:  # 5=Sat, 6=Sun
+        return
+
     resp = get_client().table("positions").select("id, days_held").eq("status", "open").execute()
     for pos in (resp.data or []):
         get_client().table("positions").update({

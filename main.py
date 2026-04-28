@@ -4,7 +4,7 @@ Saboor — Autonomous Halal Trading Agent
 Usage: python main.py <phase>
 
 Phases:
-  init       Initialize the SQLite database
+  init       Verify the Supabase schema (tables are managed remotely)
   premarket  7:30 AM — build today's watchlist
   open       9:35 AM — execute trades
   midday     12:00 PM — reassess positions

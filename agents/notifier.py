@@ -1,3 +1,4 @@
+import html
 import os
 import requests
 
@@ -13,13 +14,40 @@ def _send(text: str) -> None:
         return
 
     try:
-        requests.post(
+        # FIX [HIGH H-8]: Capture the response and check the HTTP status.
+        # REASON: Previously a 401/429/5xx from Telegram would silently
+        #         drop the alert — including the daily loss cap alert,
+        #         which the trader relies on to know that trading has halted.
+        #         No log line, no exception, no signal.
+        # SOLUTION: Capture the response, log a warning on non-200 with the
+        #         response body so misconfiguration (bad token, blocked bot,
+        #         rate limiting) is immediately visible in the phase logs.
+        resp = requests.post(
             f"{TELEGRAM_API}/bot{token}/sendMessage",
             json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
             timeout=10,
         )
+        if resp.status_code != 200:
+            # Telegram surfaces useful detail in the response body — keep it bounded.
+            body_preview = (resp.text or "")[:200]
+            print(f"Telegram non-200 status={resp.status_code}: {body_preview}")
     except requests.RequestException as e:
         print(f"Telegram send failed: {e}")
+
+
+def _safe(value) -> str:
+    """
+    FIX [MEDIUM M-1]: HTML-escape any string that may have come from Claude
+    or other untrusted sources before it lands in a parse_mode=HTML message.
+    REASON: Telegram parses HTML mode strictly — an unescaped `<`, `>`, or `&`
+        in a Claude-generated thesis could produce a 400 Bad Request from
+        Telegram, and an attacker-controllable string could attempt to
+        inject HTML tags that aren't part of the supported subset.
+    SOLUTION: html.escape every Claude-sourced string at interpolation.
+    """
+    if value is None:
+        return ""
+    return html.escape(str(value), quote=False)
 
 
 def send_eod_report(
@@ -39,7 +67,7 @@ def send_eod_report(
     a_sign = "+" if alpha >= 0 else ""
 
     text = (
-        f"<b>Saboor EOD — {date_str}</b>\n\n"
+        f"<b>Saboor EOD — {_safe(date_str)}</b>\n\n"
         f"Portfolio: <b>${portfolio_value:,.0f}</b>\n"
         f"Today: {d_arrow} {abs(daily_return):.2f}%  |  SPY: {s_arrow} {abs(spy_return):.2f}%\n"
         f"Alpha: <b>{a_sign}{alpha:.2f}%</b>\n\n"
@@ -52,9 +80,9 @@ def send_eod_report(
 
 def send_urgent(ticker: str, trigger: str, action: str) -> None:
     _send(
-        f"<b>⚠️ Saboor Alert — {ticker}</b>\n"
-        f"Trigger: {trigger}\n"
-        f"Action: {action}"
+        f"<b>⚠️ Saboor Alert — {_safe(ticker)}</b>\n"
+        f"Trigger: {_safe(trigger)}\n"
+        f"Action: {_safe(action)}"
     )
 
 
@@ -72,7 +100,9 @@ def send_premarket_report(watchlist: list[dict], excluded_count: int) -> None:
     for s in watchlist:
         bucket_icon = "🔵" if s.get("bucket") == "core" else "🟡"
         score = s.get("combined_score", 0)
-        lines.append(f"{bucket_icon} <b>{s['ticker']}</b> ({score:.0f}/100) — {s.get('thesis','')[:80]}")
+        ticker = _safe(s.get("ticker", ""))
+        thesis = _safe((s.get("thesis") or "")[:80])
+        lines.append(f"{bucket_icon} <b>{ticker}</b> ({score:.0f}/100) — {thesis}")
 
     _send(
         f"<b>Saboor Pre-Market Watchlist</b>\n\n"

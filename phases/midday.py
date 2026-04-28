@@ -21,6 +21,17 @@ def run():
 
     log_decision("midday", None, "phase_start", "Midday phase started")
 
+    # FIX [CRITICAL C-6]: Initialize `portfolio` before the try block.
+    # REASON: The previous code relied on `"portfolio" in dir()` to detect
+    #         whether the assignment landed inside the try. `dir()` is
+    #         unreliable across Python implementations and shadowing rules,
+    #         and worse — once `portfolio` was set in any prior call (it
+    #         won't be in a fresh process, but it's still a fragile pattern),
+    #         the check would pass even if THIS try block had failed.
+    # SOLUTION: Bind `portfolio = None` before the try, then explicitly
+    #         check `if portfolio is None` later. Plain, idiomatic Python.
+    portfolio = None
+
     # Refresh portfolio state
     try:
         portfolio = get_portfolio()
@@ -35,7 +46,7 @@ def run():
     # Daily loss cap check
     if is_daily_loss_cap_hit():
         pl = get_daily_pl()
-        pv = portfolio.get("total_value", 0) if "portfolio" in dir() else 0
+        pv = portfolio.get("total_value", 0) if portfolio is not None else 0
         send_daily_loss_cap_alert(pl, pv)
         log_decision("midday", None, "halted", "Daily loss cap hit")
         print("🛑 Daily loss cap hit. No midday activity.")

@@ -1,4 +1,5 @@
 .env
+.env.local
 saboor.db
 __pycache__/
 *.pyc

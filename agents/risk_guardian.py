@@ -1,4 +1,5 @@
 from tools.alpaca_client import get_bars
+from tools.technical import calculate_signals
 from db.queries import get_portfolio_value, get_open_positions_count, get_daily_pl
 
 MAX_POSITION_PCT = 0.13       # hard cap — no single position exceeds 13%
@@ -17,25 +18,36 @@ def _live_entry_check(ticker: str) -> tuple[bool, str]:
         bars = get_bars(ticker, days=210)
         if len(bars) < 55:
             return True, "ok"
-        closes = [b["close"] for b in bars]
-        current = closes[-1]
-        ma200 = sum(closes[-200:]) / 200 if len(closes) >= 200 else sum(closes) / len(closes)
 
-        deltas = [closes[-i] - closes[-i - 1] for i in range(1, 15)]
-        gains = [d for d in deltas if d > 0]
-        losses = [abs(d) for d in deltas if d < 0]
-        avg_gain = sum(gains) / 14
-        avg_loss = sum(losses) / 14 if losses else 0.001
-        rsi = 100 - (100 / (1 + avg_gain / avg_loss))
+        # FIX [HIGH H-12]: Use shared calculator instead of duplicating the math here.
+        # REASON: The Analyst and Risk Guardian had two divergent copies of
+        #         the RSI/MA200 calculation, which is a correctness hazard —
+        #         a fix in one is silently absent from the other.
+        # SOLUTION: Single source of truth in tools/technical.py.
+        signals = calculate_signals(
+            [b["close"] for b in bars],
+            [b["volume"] for b in bars],
+        )
+        rsi = signals["rsi"]
+        current = signals["current"]
+        ma200 = signals["ma200"]
 
         if rsi > RSI_BLOCK_THRESHOLD:
             return False, f"RSI {rsi:.0f} > {RSI_BLOCK_THRESHOLD} at order time — overbought, skipping"
-        if current > ma200 * (1 + MA200_EXTENSION_BLOCK):
+        if ma200 > 0 and current > ma200 * (1 + MA200_EXTENSION_BLOCK):
             ext = (current / ma200 - 1) * 100
             return False, f"Price {ext:.0f}% above MA200 at order time — too extended, skipping"
         return True, "ok"
-    except Exception:
-        return True, "ok"  # don't block on data errors
+    except Exception as e:
+        # FIX [CRITICAL C-4]: Fail closed, not open.
+        # REASON: The previous behavior swallowed every error and returned
+        #         (True, "ok"), meaning a transient data-feed issue would
+        #         silently bypass the live entry check and let a possibly
+        #         overbought trade through. Capital preservation requires
+        #         the opposite default — when in doubt, don't trade.
+        # SOLUTION: Block the entry on any exception and surface the error
+        #         in the rejection reason so it appears in the decision log.
+        return False, f"entry check failed ({e}) — skipping to protect capital"
 
 
 def validate_order(

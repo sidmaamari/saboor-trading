@@ -3,12 +3,20 @@
 
 CREATE TABLE IF NOT EXISTS portfolio (
     id BIGSERIAL PRIMARY KEY,
+    -- FIX [HIGH H-6]: One row per trading day, enforced at the schema level.
+    -- sync_portfolio() now upserts on `date`; the UNIQUE constraint backs that.
+    date DATE NOT NULL UNIQUE,
     cash REAL NOT NULL,
     equity REAL NOT NULL,
     total_value REAL NOT NULL,
     daily_pl REAL DEFAULT 0,
     last_updated TIMESTAMPTZ DEFAULT NOW()
 );
+-- For existing deployments — additive migration:
+-- ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS date DATE;
+-- UPDATE portfolio SET date = CURRENT_DATE WHERE date IS NULL;
+-- ALTER TABLE portfolio ALTER COLUMN date SET NOT NULL;
+-- CREATE UNIQUE INDEX IF NOT EXISTS uniq_portfolio_date ON portfolio(date);
 
 CREATE TABLE IF NOT EXISTS positions (
     id BIGSERIAL PRIMARY KEY,
@@ -40,6 +48,9 @@ CREATE TABLE IF NOT EXISTS watchlist (
     momentum_score REAL NOT NULL DEFAULT 0,
     combined_score REAL NOT NULL DEFAULT 0,
     bucket TEXT NOT NULL CHECK(bucket IN ('core', 'tactical')),
+    -- FIX [HIGH H-14]: position_weight_pct surfaces the analyst's per-stock
+    -- conviction-weighted allocation. Risk Guardian uses this to size the order.
+    position_weight_pct REAL DEFAULT 8,
     thesis TEXT,
     key_risks TEXT,
     sharia_status TEXT DEFAULT 'compliant',
@@ -47,6 +58,8 @@ CREATE TABLE IF NOT EXISTS watchlist (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(date, ticker)
 );
+-- For existing deployments — additive migration:
+-- ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS position_weight_pct REAL DEFAULT 8;
 
 CREATE TABLE IF NOT EXISTS decisions_log (
     id BIGSERIAL PRIMARY KEY,
