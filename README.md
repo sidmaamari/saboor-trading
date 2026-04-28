@@ -1,30 +1,52 @@
 # Saboor — Autonomous Halal Trading Agent
 
-Saboor is an AI-powered autonomous trading system designed to beat the S&P 500 through disciplined, sharia-compliant investing. It uses Claude Opus 4.7 as its decision engine, Perplexity for real-time market research, and Alpaca for trade execution.
+Saboor is an AI-powered autonomous trading system designed to beat the S&P 500 through disciplined, sharia-compliant investing. It uses Claude Opus 4.7 as its decision engine, yfinance for fundamentals research, and Alpaca for trade execution.
 
 **Currently running on Alpaca paper trading (simulated money).**
 
+---
+
 ## How It Works
 
-Saboor operates on a daily schedule across four phases:
+Saboor runs four phases every trading day, fully automated via cron:
 
-| Time (ET) | Phase | What Happens |
-|-----------|-------|--------------|
-| 7:30 AM | Pre-market | Builds a ranked watchlist of 5-10 sharia-screened stocks |
-| 9:35 AM | Market Open | Executes buy/sell decisions from the watchlist |
-| 12:00 PM | Midday | Reassesses positions; closes stops and max-hold tactical trades |
-| 3:30 PM | EOD | Closes remaining tactical positions; sends Telegram report |
+| Time (Oman) | Time (ET) | Phase | What Happens |
+|---|---|---|---|
+| 3:30 PM | 7:30 AM | Pre-market | Sharia screen → yfinance research → Analyst builds ranked watchlist |
+| 5:35 PM | 9:35 AM | Market Open | Trader executes buys from watchlist; Risk Guardian validates each order |
+| 8:00 PM | 12:00 PM | Midday | Closes tactical positions that hit their 3-day max hold |
+| 11:30 PM | 3:30 PM | EOD | Force-closes remaining tactical positions; sends Telegram report |
 
-### Strategy
+---
 
-Quality-first (Buffett lens) with momentum awareness. See [strategy.readme](strategy.readme) for the full scoring model and rules.
+## Strategy
 
-### Guardrails (enforced in code)
+Quality-first (Buffett lens) + momentum timing. See [strategy.readme](strategy.readme) for the full scoring model and rules.
 
-- Max 13% of portfolio per position
-- 2% daily loss cap — trading halts if breached
-- Sharia-compliant positions only (Zoya API + Claude secondary check)
-- Max 7 simultaneous positions (5 Core + 2 Tactical)
+**The Analyst has full authority.** Within the defined rules, it decides what to buy, how much weight to assign, and when to exit. No mechanical override will contradict a well-reasoned Analyst decision.
+
+### Entry Rules (enforced in code — cannot be overridden)
+
+- RSI > 78 → blocked (overbought)
+- Price > 150% above MA200 → blocked (over-extended)
+- FCF negative + PE > 150x + ROE negative → blocked (pure speculation)
+- Non-sharia-compliant business → blocked
+
+### Portfolio Structure
+
+| Bucket | Max Positions | Hold Duration | Exit Rule |
+|---|---|---|---|
+| Core | 17 | Weeks to months | Only when fundamental thesis breaks |
+| Tactical | 3 | Max 3 trading days | Auto-closed at EOD on day 3 |
+| **Total** | **20** | | |
+
+### Position Sizing
+
+Assigned purely by the Analyst based on `combined_score` and conviction. No hard cap on any single position. Company size and fame are irrelevant — a small company with a score of 90 gets more weight than a mega-cap with a score of 65.
+
+Target: **80–95% of capital deployed at all times.**
+
+---
 
 ## Setup
 
@@ -37,65 +59,82 @@ pip install -r requirements.txt
 ### 2. Configure API keys
 
 ```bash
-cp .env.example .env
-# Edit .env and fill in your API keys
+cp .env.example .env.local
+# Fill in your keys
 ```
 
-Required keys — see [.env.example](.env.example):
+Required keys:
 - `ANTHROPIC_API_KEY` — [console.anthropic.com](https://console.anthropic.com)
 - `ALPACA_API_KEY` + `ALPACA_SECRET_KEY` — [alpaca.markets](https://alpaca.markets) (paper account)
-- `PERPLEXITY_API_KEY` — [perplexity.ai/api](https://www.perplexity.ai/api)
-- `ZOYA_API_KEY` — [zoya.finance](https://zoya.finance)
 - `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` — create via [@BotFather](https://t.me/BotFather)
+- `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` — [supabase.com](https://supabase.com)
 
-### 3. Initialize the database
+### 3. Set up Supabase schema
+
+Run `db/supabase_schema.sql` in the Supabase SQL Editor.
+
+### 4. Schedule with cron
 
 ```bash
-python main.py init
+bash deploy/install_cron.sh   # on a Linux VPS (UTC times)
+# OR — on Mac, crontab is already configured in Oman local time
 ```
 
-## Running Saboor
+---
 
-Trigger each phase manually for testing:
+## Running Manually
 
 ```bash
-python main.py premarket   # Build today's watchlist
+python main.py premarket   # Build today's watchlist + send Telegram
 python main.py open        # Execute trades
-python main.py midday      # Reassess positions
-python main.py eod         # Close tactical positions + send report
+python main.py midday      # Reassess / close 3-day tactical holds
+python main.py eod         # Force-close tacticals + send EOD report
 ```
 
-For automated daily execution, configure Claude Code routines in `.claude/settings.json`.
+---
 
 ## Project Structure
 
 ```
 saboor-trading/
-├── main.py              # CLI entry point
-├── strategy.readme      # Full strategy documentation
-├── agents/              # Specialist AI agents
-│   ├── researcher.py    # Perplexity-powered research
-│   ├── analyst.py       # Claude scoring + watchlist building
-│   ├── trader.py        # Claude buy/sell decisions
-│   ├── risk_guardian.py # Guardrails enforcement (code-only)
-│   └── notifier.py      # Telegram notifications
-├── phases/              # Phase orchestrators
-│   ├── premarket.py     # 7:30 AM
-│   ├── market_open.py   # 9:35 AM
-│   ├── midday.py        # 12:00 PM
-│   └── eod.py           # 3:30 PM
-├── tools/               # API client wrappers
-│   ├── alpaca_client.py
-│   ├── claude_client.py
-│   ├── perplexity_client.py
-│   └── zoya_client.py
+├── main.py                  # CLI entry point (premarket / open / midday / eod)
+├── strategy.readme          # Full strategy documentation
+├── agents/
+│   ├── analyst.py           # Claude scoring model + watchlist builder
+│   ├── trader.py            # Claude buy/sell decision maker
+│   ├── risk_guardian.py     # Entry validation (RSI, MA200, position limits)
+│   ├── notifier.py          # Telegram notifications
+│   └── researcher.py        # yfinance fundamentals fetcher
+├── phases/
+│   ├── premarket.py         # 3:30 PM Oman
+│   ├── market_open.py       # 5:35 PM Oman
+│   ├── midday.py            # 8:00 PM Oman
+│   └── eod.py               # 11:30 PM Oman
+├── tools/
+│   ├── alpaca_client.py     # Alpaca REST API wrapper
+│   ├── claude_client.py     # Anthropic API wrapper (with prompt caching)
+│   ├── yfinance_client.py   # Free fundamentals from Yahoo Finance
+│   ├── sharia_screener.py   # Claude-based AAOIFI compliance gate
+│   └── technical.py         # Shared RSI + MA200 calculations
 ├── db/
-│   ├── schema.sql       # SQLite schema
-│   └── queries.py       # Database operations
-└── data/
-    └── universe.py      # S&P 500 + NASDAQ 100 tickers
+│   ├── supabase_client.py   # Supabase singleton client
+│   ├── queries.py           # All database operations
+│   └── supabase_schema.sql  # PostgreSQL schema
+├── data/
+│   └── universe.py          # ~224 S&P 500 + NASDAQ 100 tickers
+├── dashboard/               # Next.js performance dashboard (Vercel)
+├── deploy/                  # VPS setup + cron install scripts
+└── launchd/                 # macOS scheduler plists
 ```
+
+---
+
+## Dashboard
+
+Live performance vs SPY is tracked at the Vercel dashboard. Shows cumulative return chart, daily alpha, and live portfolio breakdown.
+
+---
 
 ## Disclaimer
 
-This software is for educational and paper trading purposes. It is not financial advice. Past performance of the strategy does not guarantee future results. Always consult a qualified financial advisor before investing real money.
+This software is for educational and paper trading purposes only. It is not financial advice. Past performance does not guarantee future results. Always consult a qualified financial advisor before investing real money.

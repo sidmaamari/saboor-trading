@@ -1,11 +1,9 @@
 from tools.alpaca_client import get_bars
 from tools.technical import calculate_signals
-from db.queries import get_portfolio_value, get_open_positions_count, get_daily_pl
+from db.queries import get_portfolio_value, get_open_positions_count
 
-MAX_POSITION_PCT = 0.13       # hard cap — no single position exceeds 13%
-DAILY_LOSS_CAP_PCT = 0.02     # 2% daily loss halts all trading
-MAX_CORE_POSITIONS = 8
-MAX_TACTICAL_POSITIONS = 4
+MAX_CORE_POSITIONS = 17
+MAX_TACTICAL_POSITIONS = 3
 TACTICAL_MAX_DAYS = 3
 
 RSI_BLOCK_THRESHOLD = 78       # don't buy overbought stocks
@@ -73,24 +71,7 @@ def validate_order(
     if total_value <= 0:
         return False, "Portfolio value unavailable"
 
-    # Position size — use analyst weight if provided, else fall back to hard cap
-    order_value = shares * price
-    target_pct = min((position_weight_pct or 100) / 100, MAX_POSITION_PCT)
-    max_allowed = total_value * target_pct
-    if order_value > max_allowed:
-        max_shares = int(max_allowed / price)
-        return False, (
-            f"Order ${order_value:,.0f} exceeds {target_pct*100:.0f}% target "
-            f"(${max_allowed:,.0f}). Resize to {max_shares} shares."
-        )
-
-    # Daily loss cap
-    daily_pl = get_daily_pl()
-    loss_cap = -(total_value * DAILY_LOSS_CAP_PCT)
-    if daily_pl <= loss_cap:
-        return False, f"Daily loss cap hit: ${daily_pl:,.0f} (limit ${loss_cap:,.0f})"
-
-    # Max positions
+    # Max positions — the only capacity guard; no weight cap, no loss cap
     counts = get_open_positions_count()
     if bucket == "core" and counts["core"] >= MAX_CORE_POSITIONS:
         return False, f"Core position limit reached ({MAX_CORE_POSITIONS})"
@@ -101,20 +82,16 @@ def validate_order(
 
 
 def is_daily_loss_cap_hit() -> bool:
-    portfolio = get_portfolio_value()
-    total_value = portfolio["total_value"]
-    if total_value <= 0:
-        return False
-    return get_daily_pl() <= -(total_value * DAILY_LOSS_CAP_PCT)
+    return False  # No daily loss cap — Analyst manages drawdowns by thesis
 
 
 def max_shares_for_position(price: float, position_weight_pct: float = None) -> int:
-    """Shares for a position sized by analyst weight (capped at 13%)."""
+    """Shares for a position sized by analyst-assigned weight. No hard cap."""
     portfolio = get_portfolio_value()
     total_value = portfolio["total_value"]
     if price <= 0 or total_value <= 0:
         return 0
-    target_pct = min((position_weight_pct or 100) / 100, MAX_POSITION_PCT)
+    target_pct = (position_weight_pct or 8) / 100
     return int((total_value * target_pct) / price)
 
 
