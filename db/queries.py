@@ -148,8 +148,19 @@ def save_watchlist(trading_date: date, items: list[dict]):
         }
         for item in items
     ]
-    if rows:
+    if not rows:
+        return
+    try:
         get_client().table("watchlist").insert(rows).execute()
+    except Exception as e:
+        if "position_weight_pct" in str(e):
+            # Column not yet added to Supabase schema — save without it
+            for r in rows:
+                r.pop("position_weight_pct", None)
+            get_client().table("watchlist").insert(rows).execute()
+            print("  WARNING: position_weight_pct column missing in Supabase. Run: ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS position_weight_pct REAL DEFAULT 8;")
+        else:
+            raise
 
 
 def get_todays_watchlist() -> list[dict]:

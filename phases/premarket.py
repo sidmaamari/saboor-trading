@@ -93,9 +93,25 @@ def run():
         print("No stocks passed thresholds — watchlist empty for today.")
         return []
 
-    # ── Step 7: Rank and save top 10 ─────────────────────────────────────────
-    scored.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
-    watchlist = scored[:15]
+    # ── Step 7: Enforce bucket thresholds, rank, save top 15 ─────────────────
+    def _meets_threshold(s: dict) -> bool:
+        score = s.get("combined_score", 0)
+        bucket = s.get("bucket", "")
+        quality = s.get("quality_score", 0)
+        momentum = s.get("momentum_score", 0)
+        if bucket == "core":
+            return quality >= 60 and score >= 65
+        if bucket == "tactical":
+            return momentum >= 65 and score >= 60
+        return False
+
+    qualified = [s for s in scored if _meets_threshold(s)]
+    disqualified = [s["ticker"] for s in scored if not _meets_threshold(s)]
+    if disqualified:
+        print(f"  Post-filter removed {len(disqualified)} below-threshold: {disqualified}")
+
+    qualified.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
+    watchlist = qualified[:15]
 
     save_watchlist(today, watchlist)
 
