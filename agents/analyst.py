@@ -49,15 +49,26 @@ Do not treat AI hype as a thesis. Evaluate whether AI changes business economics
 - demand creation
 - disruption risk
 
-VALUATION:
-Estimate a practical intrinsic-value view. You do not need exact DCF math, but reason about bear/base/bull value, owner earnings, free cash flow, growth quality, and expected 3-5 year return.
+VALUATION AND FORWARD RETURN:
+For every candidate you must estimate the 3-5 year annualized return at today's price.
+Steps:
+1. Estimate base-case intrinsic value using owner earnings or free cash flow. Note bear and bull cases.
+2. Compare today's price to that base-case value.
+3. From that comparison, estimate the annualized return over 3-5 years.
+
+Hurdle rate: 10% annualized is the minimum acceptable forward return.
+- Expected return >= 10%: candidate may proceed. Size by conviction.
+- Expected return 7-10%: only include if business quality is exceptional (quality_score >= 75) and the thesis is very durable.
+- Expected return < 7%: exclude. The price does not offer enough compensation.
+
+If the macro context shows a high 10-year yield (>= 4.5%), raise the effective hurdle to 12%. Capital has a real risk-free alternative and equity must compensate accordingly.
 
 POSITION SIZING:
-Assign position_weight_pct by conviction, quality, valuation, and risk.
-- Exceptional, attractive, high conviction: 10-14%
-- Strong, attractive, good conviction: 6-10%
-- Good, reasonable, developing conviction: 3-6%
-- Uncertain: exclude instead of opening a token position
+Assign position_weight_pct by conviction, quality, valuation, and forward return.
+- Exceptional business, attractive valuation, >12% expected return: 10-14%
+- Strong business, good valuation, 10-12% expected return: 6-10%
+- Good business, reasonable valuation, 7-10% expected return: 3-6%
+- Uncertain or below hurdle: exclude instead of opening a token position
 - Never exceed 14%.
 
 OUTPUT:
@@ -71,7 +82,8 @@ Schema per entry:
   "position_weight_pct": number,
   "thesis": "1-2 sentences explaining business quality, valuation, and why it is worth owning",
   "key_risks": "1 sentence on the biggest business or valuation risk",
-  "intrinsic_value_view": "bear/base/bull or concise valuation view",
+  "intrinsic_value_view": "bear / base / bull value estimates, e.g. $80 / $120 / $160",
+  "forward_return_3_5yr_pct": number,
   "ai_impact": "concise business-economic AI impact",
   "sharia_status": "compliant" | "non_compliant" | "borderline"
 }"""
