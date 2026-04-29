@@ -163,16 +163,16 @@ Minimum position size:
 
 Suggested initial sizing:
 
-  Exceptional business, attractive valuation, high conviction
+  Exceptional business, attractive valuation, >12% expected return
     10-14%
 
-  Strong business, attractive valuation, good conviction
+  Strong business, good valuation, 10-12% expected return
     6-10%
 
-  Good business, reasonable valuation, developing conviction
+  Good business, reasonable valuation, 7-10% expected return
     3-6%
 
-  Watchlist-only or uncertain
+  Below hurdle or uncertain
     0%; hold cash and wait
 
 -----------------------------------------------------------------------------
@@ -204,12 +204,46 @@ The Analyst may recommend five actions:
     value falls materially, or forward expected return becomes unattractive.
 
 -----------------------------------------------------------------------------
+MACRO CONTEXT
+-----------------------------------------------------------------------------
+Saboor fetches current macro data at every pre-market and market-open phase:
+  - 10-year Treasury yield
+  - 3-month T-bill yield
+  - Yield curve spread (10yr minus 3mo)
+
+This context is not a trading signal. It is never a reason to buy or sell
+on its own. It informs:
+
+  Required margin of safety
+    Higher rates raise the bar. A business must offer more to compete with
+    a risk-free alternative.
+
+  Forward expected return hurdle
+    Base hurdle: 10% annualized.
+    When 10-year yield >= 4.5%: hurdle rises to 12%.
+
+  Debt and refinancing risk
+    Leveraged companies face higher rollover costs in a high-rate environment.
+    The Analyst must assess whether the debt load is sustainable.
+
+  Durability of pricing power
+    Inflation tests whether a company can pass costs to customers. The Analyst
+    must judge whether margins will hold, compress, or improve.
+
+  Cash preference
+    When the opportunity set is weak and rates are high, holding cash is
+    explicitly preferable to buying mediocre businesses.
+
+Macro context does not change the buy/sell framework. It tightens or loosens
+the valuation discipline applied within that framework.
+
+-----------------------------------------------------------------------------
 INTRINSIC VALUE AND OVERVALUATION
 -----------------------------------------------------------------------------
 Saboor does not sell because "the market is greedy." It sells or trims only
 when price is no longer justified by business value.
 
-For each owned company, the Analyst should maintain an intrinsic-value band:
+For each owned company, the Analyst must maintain an intrinsic-value band:
 
   Bear value
     Conservative assumptions for growth, margins, and multiple.
@@ -220,26 +254,46 @@ For each owned company, the Analyst should maintain an intrinsic-value band:
   Bull value
     Optimistic but defensible outcome.
 
-The Analyst should estimate expected 3-5 year annualized return from today's
-price. If expected return falls below the hurdle rate, and better uses of
-capital exist, a trim or exit is justified.
+The Analyst must estimate the expected 3-5 year annualized return from
+today's price for every candidate and every open position.
 
-Overvaluation alone does not require immediate sale. Excellent businesses can
-remain expensive for long periods. The stronger the business quality and moat,
-the more patient Saboor can be. The weaker the business quality, the less
-tolerance Saboor has for overvaluation.
+Hurdle rate: 10% annualized.
+When 10-year Treasury yield >= 4.5%, the effective hurdle rises to 12%.
+
+  Expected return >= hurdle AND thesis intact
+    Hold or Add.
+
+  Expected return below hurdle AND business is excellent AND thesis is intact
+    Hold. Excellent businesses can stay expensive for long periods.
+    Patience is a feature, not a weakness.
+
+  Price materially above base-case intrinsic value AND return is poor
+  AND position is large
+    Trim. Reduce size, do not exit.
+
+  Expected return well below hurdle AND thesis has weakened
+  OR a clearly superior opportunity exists
+    Trim or Exit.
+
+  Thesis breaks, sharia changes, moat deteriorates, debt becomes dangerous
+    Exit, regardless of price.
+
+Exit is a high bar. Prefer Trim over Exit when the business is still good
+but the price is stretched. Never exit solely because of short-term price
+weakness, market fear, or macro headlines.
 
 -----------------------------------------------------------------------------
 SELLING RULES
 -----------------------------------------------------------------------------
-Price decline alone is not a sell reason. A position down 5%, 10%, or 20% can
-still be a hold or add if the business has improved and valuation is better.
+Price decline alone is not a sell reason. A position down 5%, 10%, or 20%
+can still be a hold or add if the business has improved and valuation is
+better.
 
 Valid reasons to Trim:
-  - Price is materially above the intrinsic-value band
-  - Expected 3-5 year return is no longer attractive
+  - Price is materially above the base-case intrinsic value
+  - Expected 3-5 year return is below the hurdle rate
   - Position size has become too large relative to risk or conviction
-  - A superior opportunity exists
+  - A clearly superior opportunity exists
 
 Valid reasons to Exit:
   - Sharia status changes
@@ -254,7 +308,8 @@ Invalid reasons to sell:
   - Short-term price volatility
   - Market-wide drawdown by itself
   - RSI or moving-average weakness alone
-  - Headlines that do not change business economics
+  - Macro fear without a change in business economics
+  - Headlines that do not change how the business operates or earns
 
 -----------------------------------------------------------------------------
 DAILY PHASES (Oman time, UTC+4)
@@ -271,10 +326,13 @@ WHAT SABOOR NEVER DOES
 - Buy or add when hard entry filters are triggered
 - Buy purely because of momentum
 - Sell purely because the price went down
+- Sell because macro conditions are scary
+- Buy because macro conditions are favorable
 - Force capital deployment when opportunities are weak
 - Open meaningless token positions
 - Let one position exceed 14% of portfolio value
 - Treat AI hype as a thesis without business-economic evidence
+- Exit a good business just because it looks expensive by one metric
 
 -----------------------------------------------------------------------------
 BENCHMARK

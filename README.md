@@ -64,14 +64,36 @@ The system may average up or average down only after a fresh review confirms:
 - the forward expected return remains attractive
 - the resulting position stays within the 14% cap
 
+### Valuation and Forward Return
+
+For every candidate and every open position, the Analyst estimates the expected 3-5 year annualized return at today's price.
+
+**Hurdle rate: 10% annualized.** When the 10-year Treasury yield is ≥ 4.5%, the effective hurdle rises to 12%.
+
+Candidates below the hurdle are excluded before reaching the Trader. Existing positions below the hurdle are reviewed against the framework below.
+
+### Macro Context
+
+At every pre-market and market-open phase, Saboor fetches the current 10-year Treasury yield, 3-month T-bill yield, and yield curve spread. This context is not a buy or sell signal. It informs required margin of safety, the forward return hurdle, debt risk assessment, and whether cash is preferable to weak opportunities.
+
 ### Selling, Trimming, and Valuation
 
 Saboor never sells just because a stock price dropped. Price movement is information, not a thesis.
 
+| Situation | Action |
+|---|---|
+| Expected return ≥ hurdle, thesis intact | Hold or Add |
+| Expected return below hurdle, excellent business, thesis intact | Hold — patience is valid |
+| Price materially above intrinsic value, poor return, large position | Trim |
+| Return well below hurdle, thesis weakened or superior opportunity exists | Trim or Exit |
+| Thesis breaks, sharia changes, moat or balance sheet deteriorates | Exit |
+
+Exit is a high bar. Prefer `Trim` over `Exit` when the business is still good but the price is stretched.
+
 Valid reasons to `Trim`:
 
-- the business remains excellent, but price is materially above intrinsic value
-- expected 3-5 year forward return has fallen below the hurdle rate
+- price is materially above the base-case intrinsic value
+- expected 3-5 year return is below the hurdle rate
 - the position has grown too large relative to risk or conviction
 - a clearly superior opportunity exists
 
@@ -81,9 +103,9 @@ Valid reasons to `Exit`:
 - sharia status changes
 - management, balance sheet, moat, or industry structure deteriorates
 - intrinsic value falls materially
-- forward expected return is unattractive and capital is better used elsewhere
+- forward expected return is poor and capital is clearly better used elsewhere
 
-Saboor judges overvaluation through an intrinsic-value band, not market mood. The Analyst should estimate bear/base/bull value ranges and compare today's price to expected business cash generation.
+Saboor judges overvaluation through a bear/base/bull intrinsic-value band, not market mood or macro fear.
 
 ---
 
@@ -156,7 +178,8 @@ saboor-trading/
 │   ├── claude_client.py
 │   ├── yfinance_client.py
 │   ├── sharia_screener.py
-│   └── technical.py
+│   ├── technical.py
+│   └── macro_client.py
 ├── db/
 │   ├── supabase_client.py
 │   ├── queries.py
