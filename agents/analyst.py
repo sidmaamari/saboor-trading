@@ -2,6 +2,7 @@ import json
 from tools.claude_client import complete
 from tools.alpaca_client import get_bars
 from tools.technical import calculate_signals
+from tools.macro_client import format_macro_context
 
 MAX_POSITION_WEIGHT_PCT = 14
 
@@ -152,7 +153,11 @@ def _normalize_score(item: dict) -> dict | None:
     return normalized
 
 
-def score_stocks(dossiers: list[dict], spy_return_30d: float = 0.0) -> list[dict]:
+def score_stocks(
+    dossiers: list[dict],
+    spy_return_30d: float = 0.0,
+    macro: dict | None = None,
+) -> list[dict]:
     """Score dossiers and return Buffett-style ownership candidates."""
     stock_data = []
     for d in dossiers:
@@ -181,7 +186,9 @@ def score_stocks(dossiers: list[dict], spy_return_30d: float = 0.0) -> list[dict
     if not stock_data:
         return []
 
+    macro_block = format_macro_context(macro or {})
     user_msg = (
+        f"{macro_block}"
         f"Build ownership candidates. SPY 30-day return: {spy_return_30d:.2f}%.\n\n"
         f"Stock data:\n{json.dumps(stock_data, indent=2)}\n\n"
         "Return JSON array only."

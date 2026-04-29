@@ -4,6 +4,7 @@ Reviews candidates and open positions. Risk Guardian gates every order.
 """
 from datetime import date
 from tools.alpaca_client import get_portfolio
+from tools.macro_client import get_macro_snapshot
 from agents.trader import execute_trades
 from db.queries import get_todays_watchlist, get_open_positions, log_decision, sync_portfolio
 
@@ -40,8 +41,14 @@ def run():
 
     print(f"\nCandidates: {len(watchlist)} stocks | Open positions: {len(open_positions)}")
 
+    macro = get_macro_snapshot()
+    if macro.get("ten_year_yield_pct"):
+        print(f"  Macro: 10yr {macro['ten_year_yield_pct']:.2f}% | "
+              f"3mo {macro.get('three_month_yield_pct', 'n/a')}% | "
+              f"Spread {macro.get('yield_curve_spread_pct', 'n/a')}%")
+
     # Execute
-    result = execute_trades(watchlist, open_positions)
+    result = execute_trades(watchlist, open_positions, macro=macro)
 
     log_decision(
         "market_open", None, "phase_complete",

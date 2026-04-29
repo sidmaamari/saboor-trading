@@ -5,6 +5,7 @@ Builds the ranked ownership candidate list for the day.
 from datetime import date
 from tools.alpaca_client import get_bars
 from tools.sharia_screener import bulk_screen
+from tools.macro_client import get_macro_snapshot
 from agents.researcher import build_dossiers
 from agents.analyst import score_stocks
 from agents.notifier import send_premarket_report
@@ -78,9 +79,17 @@ def run():
     )
     print(f"\nSPY 30-day return: {spy_30d:.2f}%")
 
+    # ── Step 5b: Macro context ────────────────────────────────────────────────
+    print("Fetching macro context...")
+    macro = get_macro_snapshot()
+    if macro.get("ten_year_yield_pct"):
+        print(f"  10yr yield: {macro['ten_year_yield_pct']:.2f}% | "
+              f"3mo: {macro.get('three_month_yield_pct', 'n/a')}% | "
+              f"Spread: {macro.get('yield_curve_spread_pct', 'n/a')}%")
+
     # ── Step 6: Claude Analyst scores all dossiers ───────────────────────────
     print("\nScoring candidates via Claude Analyst...")
-    scored = score_stocks(dossiers, spy_return_30d=spy_30d)
+    scored = score_stocks(dossiers, spy_return_30d=spy_30d, macro=macro)
 
     excluded_count = len(top_candidates) - len(scored)
 

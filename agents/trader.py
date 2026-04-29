@@ -4,6 +4,7 @@ from datetime import date
 from tools.claude_client import complete
 from tools.alpaca_client import place_order, get_price
 from agents.risk_guardian import validate_order, max_shares_for_position
+from tools.macro_client import format_macro_context
 from data.universe import get_universe
 from db.queries import (
     save_position,
@@ -88,7 +89,11 @@ def _actions_from_decisions(decisions: dict) -> list[dict]:
     return actions
 
 
-def execute_trades(watchlist: list[dict], open_positions: list[dict]) -> dict:
+def execute_trades(
+    watchlist: list[dict],
+    open_positions: list[dict],
+    macro: dict | None = None,
+) -> dict:
     """
     Ask Claude for Buy/Add/Hold/Trim/Exit decisions, then execute approved orders.
     """
@@ -111,7 +116,9 @@ def execute_trades(watchlist: list[dict], open_positions: list[dict]) -> dict:
         except Exception as e:
             print(f"  Price fetch failed for {ticker}: {e}")
 
+    macro_block = format_macro_context(macro or {})
     user_msg = (
+        f"{macro_block}"
         "Make portfolio decisions under the Buffett-style strategy.\n\n"
         f"REFRESHED CANDIDATES:\n{json.dumps(enriched_candidates, indent=2)}\n\n"
         f"OPEN POSITIONS:\n{json.dumps(open_positions, indent=2)}\n\n"
