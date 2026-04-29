@@ -26,6 +26,7 @@ echo "=== Installing Python packages ==="
 
 echo "=== Creating logs directory ==="
 mkdir -p "$INSTALL_DIR/logs"
+chmod 755 "$INSTALL_DIR/logs"
 
 echo "=== Creating .env.local ==="
 cat > "$INSTALL_DIR/.env.local" << 'ENVEOF'
