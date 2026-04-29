@@ -68,7 +68,7 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Saboor</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Autonomous Halal Trading — Paper Portfolio
+            Autonomous Halal Investing — Paper Portfolio
           </p>
         </div>
         <p className="text-xs text-gray-600">
@@ -138,7 +138,6 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
           </p>
         ) : (
           livePositions.map((pos) => {
-            const isCore = pos.unrealized_plpc !== undefined;
             return (
               <div
                 key={pos.ticker}

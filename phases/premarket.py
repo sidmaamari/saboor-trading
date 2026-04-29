@@ -1,14 +1,14 @@
 """
 Pre-market phase — 7:30 AM ET
-Builds the ranked watchlist for the day. This is the only place the watchlist is created.
+Builds the ranked ownership candidate list for the day.
 """
 from datetime import date
-from tools.alpaca_client import get_bars, get_price
+from tools.alpaca_client import get_bars
 from tools.sharia_screener import bulk_screen
 from agents.researcher import build_dossiers
-from agents.analyst import score_stocks, _calculate_momentum
+from agents.analyst import score_stocks
 from agents.notifier import send_premarket_report
-from db.queries import save_watchlist, log_decision, update_positions_days_held
+from db.queries import save_watchlist, log_decision
 from data.universe import get_universe
 
 
@@ -19,9 +19,6 @@ def run():
     print(f"{'='*50}")
 
     log_decision("premarket", None, "phase_start", f"Pre-market phase started for {today}")
-
-    # Increment days_held for all open tactical positions
-    update_positions_days_held()
 
     # ── Step 1: Full universe ─────────────────────────────────────────────────
     all_tickers = get_universe()
@@ -44,8 +41,8 @@ def run():
         (t, "needs_review") for t in needs_review
     ]
 
-    # ── Step 3: Quick momentum screen — pick top 35 for deep research ─────────
-    print("\nRunning momentum pre-screen...")
+    # ── Step 3: Quick relative-strength screen — pick top 35 for research ────
+    print("\nRunning entry-timing pre-screen...")
     momentum_scores = []
 
     for ticker, sharia_status in candidate_pool:
@@ -55,8 +52,8 @@ def run():
                 continue
             return_30d = (bars[-1]["close"] - bars[-30]["close"]) / bars[-30]["close"] * 100
             momentum_scores.append((ticker, sharia_status, return_30d))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  Momentum pre-screen failed for {ticker}: {e}")
 
     momentum_scores.sort(key=lambda x: x[2], reverse=True)
     top_candidates = momentum_scores[:35]
@@ -81,11 +78,11 @@ def run():
     )
     print(f"\nSPY 30-day return: {spy_30d:.2f}%")
 
-    # ── Step 6: Claude Analyst scores all dossiers ────────────────────────────
+    # ── Step 6: Claude Analyst scores all dossiers ───────────────────────────
     print("\nScoring candidates via Claude Analyst...")
     scored = score_stocks(dossiers, spy_return_30d=spy_30d)
 
-    excluded_count = len([t for t, _, _ in top_candidates]) - len(scored)
+    excluded_count = len(top_candidates) - len(scored)
 
     if not scored:
         log_decision("premarket", None, "no_candidates", "No stocks passed scoring thresholds")
@@ -93,17 +90,11 @@ def run():
         print("No stocks passed thresholds — watchlist empty for today.")
         return []
 
-    # ── Step 7: Enforce bucket thresholds, rank, save top 15 ─────────────────
+    # ── Step 7: Enforce quality threshold, rank, save top candidates ─────────
     def _meets_threshold(s: dict) -> bool:
         score = s.get("combined_score", 0)
-        bucket = s.get("bucket", "")
         quality = s.get("quality_score", 0)
-        momentum = s.get("momentum_score", 0)
-        if bucket == "core":
-            return quality >= 60 and score >= 65
-        if bucket == "tactical":
-            return momentum >= 65 and score >= 60
-        return False
+        return quality >= 60 and score >= 65
 
     qualified = [s for s in scored if _meets_threshold(s)]
     disqualified = [s["ticker"] for s in scored if not _meets_threshold(s)]
@@ -111,20 +102,21 @@ def run():
         print(f"  Post-filter removed {len(disqualified)} below-threshold: {disqualified}")
 
     qualified.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
-    watchlist = qualified[:15]
+    watchlist = qualified[:20]
 
     save_watchlist(today, watchlist)
 
-    print(f"\nWatchlist ({len(watchlist)} stocks):")
+    print(f"\nOwnership candidates ({len(watchlist)} stocks):")
     for s in watchlist:
         print(
-            f"  {s['ticker']:6} | {s['combined_score']:5.1f} | {s['bucket']:8} | {s['thesis'][:60]}"
+            f"  {s['ticker']:6} | {s['combined_score']:5.1f} | {s['thesis'][:70]}"
         )
 
-    send_premarket_report(watchlist, excluded_count)
+    below_threshold_count = len(scored) - len(qualified)
+    send_premarket_report(watchlist, excluded_count + below_threshold_count)
 
     log_decision(
         "premarket", None, "phase_complete",
-        f"Watchlist: {[s['ticker'] for s in watchlist]}"
+        f"Candidates: {[s['ticker'] for s in watchlist]}"
     )
     return watchlist

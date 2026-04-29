@@ -1,183 +1,286 @@
-SABOOR — TRADING STRATEGY
-=========================
+SABOOR - INVESTING STRATEGY
+===========================
 
-Goal: Beat the S&P 500 (SPY) over time through disciplined, halal investing.
+Goal: Beat the S&P 500 (SPY) over time through disciplined, halal, Buffett-style ownership of excellent businesses.
 
-─────────────────────────────────────────────────────────────────────────────
+-----------------------------------------------------------------------------
 THE THESIS
-─────────────────────────────────────────────────────────────────────────────
-Saboor thinks like Warren Buffett but moves with purpose.
+-----------------------------------------------------------------------------
+Saboor is a business-owner system, not a trading system.
 
-The primary lens is quality: strong revenue growth, wide moats, healthy
-balance sheets, positive free cash flow. These are businesses worth owning —
-not just trading. The secondary lens is momentum: timing matters, and a stock
-with both a strong fundamental case AND a strong technical setup is the ideal
-entry.
+It buys companies that are understandable, sharia-compliant, financially strong,
+well-managed, and capable of compounding value over years. Momentum may improve
+entry timing, but it is never the reason to own a business. News is useful only
+when it changes the economics of the company.
 
-News and events are noted but never the primary driver. Saboor does not chase
-headlines. It buys quality on good setups and holds until the thesis breaks.
+The Analyst has discretion inside strict boundaries. It decides whether to Buy,
+Add, Hold, Trim, or Exit, but every decision must be explained through business
+quality, moat, balance sheet, valuation, forward expected return, sharia status,
+and portfolio concentration.
 
-The Analyst has full authority over portfolio construction. Within the rules
-defined here, it decides what to buy, how much weight to assign each position,
-when to exit, and how to balance the portfolio. No mechanical override
-will contradict a well-reasoned Analyst decision.
+Saboor does not force deployment. Cash is a valid position when the opportunity
+set is weak.
 
-─────────────────────────────────────────────────────────────────────────────
+-----------------------------------------------------------------------------
 INVESTABLE UNIVERSE
-─────────────────────────────────────────────────────────────────────────────
-S&P 500 + NASDAQ 100 (~224 tickers after sharia screening).
+-----------------------------------------------------------------------------
+The investable universe starts with a curated S&P 500 + NASDAQ 100 list.
 
 Conventional banks, insurance, alcohol, tobacco, weapons manufacturers,
-gambling, adult entertainment, and pork-related businesses are excluded
-before scoring begins.
+gambling, adult entertainment, and pork-related businesses are excluded before
+capital is committed.
 
-─────────────────────────────────────────────────────────────────────────────
+-----------------------------------------------------------------------------
 SHARIA COMPLIANCE
-─────────────────────────────────────────────────────────────────────────────
-Every stock passes a two-layer Claude gate before entering the watchlist:
+-----------------------------------------------------------------------------
+Every stock must pass a two-layer sharia review before purchase:
 
-1. Bulk screen (pre-market) — Claude classifies all universe tickers by
-   primary business activity using AAOIFI criteria:
-   - non_compliant: conventional banks, alcohol, tobacco, weapons, gambling,
-     adult entertainment, pork → permanently excluded this session
-   - compliant: tech, healthcare, consumer goods (halal), industrials
-     (non-weapons), energy, payment networks → proceed
-   - needs_review: mixed or uncertain → passed to deep check
+1. Bulk screen (pre-market)
+   Claude classifies universe tickers by primary business activity using AAOIFI
+   criteria:
+   - non_compliant: excluded for the session
+   - compliant: may proceed
+   - needs_review: passed to deeper Analyst review
 
-2. Deep check (Analyst phase) — needs_review tickers that reach the top-35
-   research candidates are re-evaluated by the Analyst using the full
-   yfinance dossier and AAOIFI financial ratio tests:
-   - Interest-bearing debt < 33% of market cap
-   - Interest income < 5% of total revenue
+2. Deep check (Analyst phase)
+   The Analyst reviews business activity and financial ratios using the
+   available yfinance dossier and any existing position context:
+   - Interest-bearing debt should be below AAOIFI tolerance
+   - Interest income should be immaterial
    - Primary business activity must be halal
 
-A stock that fails either gate is excluded for that session.
+Any stock that fails sharia review cannot be bought or added to. If an existing
+holding later becomes non-compliant, the Analyst must recommend an orderly exit.
 
-─────────────────────────────────────────────────────────────────────────────
-HARD ENTRY FILTERS (enforced in code before Claude sees the stock)
-─────────────────────────────────────────────────────────────────────────────
-These are pre-filters, not discretionary rules. They run in Python before
-the Analyst receives any data, so Claude cannot override them:
+-----------------------------------------------------------------------------
+HARD ENTRY FILTERS
+-----------------------------------------------------------------------------
+These filters are enforced in code for new buys and adds. Claude cannot
+override them:
 
-  RSI > 78         → Excluded. Overbought, high reversal risk.
-  Price > 150% above MA200 → Excluded. Dangerously extended.
-  FCF negative AND PE > 150x AND ROE negative → Excluded. Pure speculation.
+  RSI > 78
+    Blocked. The stock is overbought and reversal risk is high.
 
-Everything else is the Analyst's call.
+  Price > 150% above MA200
+    Blocked. The stock is dangerously extended.
 
-─────────────────────────────────────────────────────────────────────────────
+  FCF negative AND PE > 150x AND ROE negative
+    Blocked. This is speculation without a fundamental floor.
+
+  Position would exceed 14% of portfolio value
+    Blocked. Concentration is allowed, domination by one name is not.
+
+These are entry filters. They are not automatic sell triggers.
+
+-----------------------------------------------------------------------------
+BUSINESS QUALITY MODEL
+-----------------------------------------------------------------------------
+The Analyst should evaluate each company as a business first:
+
+  Circle of competence
+    Is the business understandable enough for Saboor to own it?
+
+  Moat
+    Does the company have durable competitive advantages such as network
+    effects, switching costs, brand strength, cost advantage, distribution, or
+    data/AI advantages that translate into real economics?
+
+  Financial quality
+    Revenue growth, gross margin, return on equity, free cash flow durability,
+    debt load, capital intensity, and reinvestment runway.
+
+  Management and capital allocation
+    Does management allocate capital rationally? Are buybacks, debt, M&A, and
+    reinvestment decisions sensible?
+
+  AI-era impact
+    AI is not a magic word. The Analyst must decide whether AI strengthens or
+    weakens the actual business economics:
+    - Does AI expand the moat?
+    - Does it reduce costs structurally?
+    - Does it increase pricing power?
+    - Does it create new demand?
+    - Does it disrupt the company's product or margin structure?
+
+  Valuation
+    Is the current price sensible relative to owner earnings, free cash flow,
+    growth quality, and downside risk?
+
+-----------------------------------------------------------------------------
 SCORING MODEL
-─────────────────────────────────────────────────────────────────────────────
-Every candidate receives two sub-scores (0–100 each):
+-----------------------------------------------------------------------------
+Scores are aids to judgment, not substitutes for judgment.
 
-QUALITY SCORE (Buffett lens):
+QUALITY SCORE (0-100):
   Revenue growth YoY   >20% = 25 | 10-20% = 15 | <10% = 5 | negative = 0
   Gross margin         >50% = 20 | 30-50% = 12 | <30% = 5
   Return on Equity     >20% = 20 | 10-20% = 12 | <10% = 5 | negative = -10
-  Debt / Equity        <0.3 = 20 | 0.3-1.0= 12 | >1.0 = 5
-  Free Cash Flow       positive  = 10 | negative = 0
-  PEG ratio            <1.5 = 5  | 1.5-2.5= 3  | >2.5 = 0 | N/A = 2
-  Penalty: FCF negative + PE > 100x → subtract 10 from quality score
+  Debt / Equity        <0.3 = 20 | 0.3-1.0 = 12 | >1.0 = 5
+  Free Cash Flow       positive = 10 | negative = 0
+  PEG ratio            <1.5 = 5 | 1.5-2.5 = 3 | >2.5 = 0 | N/A = 2
+  Penalty: FCF negative + PE > 100x -> subtract 10 from quality score
 
-MOMENTUM SCORE (technical setup):
+ENTRY TIMING SCORE (0-100):
   Price above 50-day MA    yes = 25 | no = 0
   Price above 200-day MA   yes = 25 | no = 0
-  RSI (14-day)             40–65 = 25 | 65–72 = 15 | 72–78 = 5 | outside = EXCLUDE
-  Volume vs 20-day avg     above  = 15 | below  = 0
+  RSI (14-day)             40-65 = 25 | 65-72 = 15 | 72-78 = 5
+  Volume vs 20-day avg     above = 15 | below = 0
   30-day return vs SPY     outperforming = 10 | underperforming = 0
-  Penalty: price > 100% above MA200 → subtract 10 from momentum score
 
-─────────────────────────────────────────────────────────────────────────────
-BUCKET CLASSIFICATION
-─────────────────────────────────────────────────────────────────────────────
-CORE (quality-driven, long-term):
-  Entry threshold:   combined_score >= 65, quality_score >= 60
-  Combined formula:  quality × 0.60 + momentum × 0.40
-  Hold logic:        Hold indefinitely while thesis is intact.
-                     A falling price is NOT a reason to exit.
-                     Only exit when the fundamental thesis breaks:
-                     revenue collapse, margin destruction, sector disruption.
+The entry timing score can help decide whether to buy now, wait, or add slowly.
+It must not turn a weak business into a buy.
 
-TACTICAL (momentum-driven, short-term):
-  Entry threshold:   combined_score >= 60, momentum_score >= 65
-  Combined formula:  quality × 0.30 + momentum × 0.70
-  Hold logic:        Hold while momentum is intact.
-  Max hold:          3 trading days — reclassify as Core or close at EOD.
-  Auto-close:        EOD on day 3. No price-based stops.
+-----------------------------------------------------------------------------
+PORTFOLIO CONSTRUCTION
+-----------------------------------------------------------------------------
+Saboor has one portfolio. There is no tactical bucket.
 
-─────────────────────────────────────────────────────────────────────────────
+There is no fixed target number of holdings. Position count is an output of
+conviction, account size, opportunity quality, and valuation.
+
+Guidance by account size:
+
+  Under $5k       3-5 positions
+  $5k-$25k        4-8 positions
+  $25k-$100k      5-10 positions
+  $100k+          6-12 positions
+
+These ranges are not quotas. Saboor should not buy mediocre companies just to
+fill slots. If only three great opportunities exist, hold three. If none exist,
+hold cash.
+
+-----------------------------------------------------------------------------
 POSITION SIZING
-─────────────────────────────────────────────────────────────────────────────
-The Analyst assigns position weight based purely on combined_score and
-conviction. Company size, market cap, and name recognition are irrelevant.
-A small unknown company with a score of 90 gets more weight than a mega-cap
-with a score of 65. Score drives everything.
+-----------------------------------------------------------------------------
+Position weight is based on conviction, business quality, valuation, and risk.
 
-  CORE positions:
-    combined_score 85–100 → 11–15%
-    combined_score 75–84  → 8–11%
-    combined_score 65–74  → 5–8%
-    combined_score 55–64  → 3–5%
+Maximum position size:
+  14% of total portfolio value.
 
-  TACTICAL positions:
-    combined_score 80–100 → 4–6%
-    combined_score 70–79  → 3–4%
-    combined_score 60–69  → 2–3%
+Minimum position size:
+  No formal percentage minimum. However, Saboor should avoid token positions
+  that are too small to matter relative to account size and monitoring effort.
 
-There is no hard cap on any single position. The Analyst assigns weight
-based on its conviction. The goal is 80–95% of capital deployed at all
-times — idle cash does not beat the market.
+Suggested initial sizing:
 
-─────────────────────────────────────────────────────────────────────────────
-PORTFOLIO LIMITS
-─────────────────────────────────────────────────────────────────────────────
-  Maximum total positions:    20  (17 Core + 3 Tactical)
-  Maximum Core positions:     17
-  Maximum Tactical positions:  3
+  Exceptional business, attractive valuation, high conviction
+    10-14%
 
-These are capacity limits, not targets. The Analyst should fill positions
-only when there are genuinely high-conviction candidates.
+  Strong business, attractive valuation, good conviction
+    6-10%
 
-─────────────────────────────────────────────────────────────────────────────
-DAILY PHASES (Oman time, UTC+4)
-─────────────────────────────────────────────────────────────────────────────
-  3:30 PM  PRE-MARKET    Sharia screen + yfinance research + Analyst watchlist
-  5:35 PM  MARKET OPEN   Trader executes from watchlist via Risk Guardian
-  8:00 PM  MIDDAY        Closes tactical positions at 3-day max
- 11:30 PM  EOD           Closes remaining tactical positions + Telegram report
+  Good business, reasonable valuation, developing conviction
+    3-6%
 
-─────────────────────────────────────────────────────────────────────────────
+  Watchlist-only or uncertain
+    0%; hold cash and wait
+
+-----------------------------------------------------------------------------
+ACTIONS
+-----------------------------------------------------------------------------
+The Analyst may recommend five actions:
+
+  Buy
+    Open a new position when business quality, sharia status, valuation, and
+    expected return justify ownership.
+
+  Add
+    Increase an existing position when the thesis is intact or stronger, the
+    valuation remains attractive, and the position stays below the 14% cap.
+    Adding can happen after a price decline or a price increase, but never
+    because of price alone.
+
+  Hold
+    Do nothing when the thesis is intact and expected return remains acceptable.
+
+  Trim
+    Reduce a position when the business is still good but valuation is stretched,
+    the position has grown too large relative to risk, conviction has softened,
+    or a clearly better opportunity exists. Trims are discretionary, not
+    automatic rebalancing.
+
+  Exit
+    Close the position when the thesis breaks, sharia status changes, intrinsic
+    value falls materially, or forward expected return becomes unattractive.
+
+-----------------------------------------------------------------------------
+INTRINSIC VALUE AND OVERVALUATION
+-----------------------------------------------------------------------------
+Saboor does not sell because "the market is greedy." It sells or trims only
+when price is no longer justified by business value.
+
+For each owned company, the Analyst should maintain an intrinsic-value band:
+
+  Bear value
+    Conservative assumptions for growth, margins, and multiple.
+
+  Base value
+    Reasonable owner-earnings or free-cash-flow estimate.
+
+  Bull value
+    Optimistic but defensible outcome.
+
+The Analyst should estimate expected 3-5 year annualized return from today's
+price. If expected return falls below the hurdle rate, and better uses of
+capital exist, a trim or exit is justified.
+
+Overvaluation alone does not require immediate sale. Excellent businesses can
+remain expensive for long periods. The stronger the business quality and moat,
+the more patient Saboor can be. The weaker the business quality, the less
+tolerance Saboor has for overvaluation.
+
+-----------------------------------------------------------------------------
 SELLING RULES
-─────────────────────────────────────────────────────────────────────────────
-NEVER sell because a price dropped. A position down 5%, 10%, even 20% is
-noise if the thesis is intact. The Analyst believes in the position — it
-will hold unless the fundamental case breaks.
+-----------------------------------------------------------------------------
+Price decline alone is not a sell reason. A position down 5%, 10%, or 20% can
+still be a hold or add if the business has improved and valuation is better.
 
-Valid reasons to exit a Core position:
-  - Earnings significantly miss expectations, revealing a broken business
-  - Gross margin or revenue trend has reversed structurally
-  - Debt has increased dangerously without a clear rationale
-  - Sector has been disrupted and the moat no longer holds
-  - Sharia status has changed
+Valid reasons to Trim:
+  - Price is materially above the intrinsic-value band
+  - Expected 3-5 year return is no longer attractive
+  - Position size has become too large relative to risk or conviction
+  - A superior opportunity exists
 
-Invalid reasons to exit:
+Valid reasons to Exit:
+  - Sharia status changes
+  - The business thesis breaks
+  - Moat weakens structurally
+  - Revenue, margins, or free cash flow deteriorate materially
+  - Debt or capital allocation becomes dangerous
+  - Intrinsic value falls materially
+  - Expected return is poor and capital can be better redeployed
+
+Invalid reasons to sell:
   - Short-term price volatility
-  - Market-wide drawdown (if our positions are fundamentally sound, hold)
-  - News headlines without fundamental backing
+  - Market-wide drawdown by itself
+  - RSI or moving-average weakness alone
+  - Headlines that do not change business economics
 
-─────────────────────────────────────────────────────────────────────────────
+-----------------------------------------------------------------------------
+DAILY PHASES (Oman time, UTC+4)
+-----------------------------------------------------------------------------
+  3:30 PM  PRE-MARKET    Sharia screen + yfinance research + candidate refresh
+  5:35 PM  MARKET OPEN   Buy/Add/Hold/Trim/Exit review through Risk Guardian
+  8:00 PM  MIDDAY        Portfolio monitoring and urgent thesis/compliance checks
+ 11:30 PM  EOD           Benchmark record + Telegram report
+
+-----------------------------------------------------------------------------
 WHAT SABOOR NEVER DOES
-─────────────────────────────────────────────────────────────────────────────
-- Trade non-sharia-compliant stocks (hard-blocked in code)
-- Buy a stock with RSI > 78 or price > 150% above MA200 (hard-blocked in code)
-- Chase earnings or news events as the primary trade thesis
-- Sell a position purely because the price went down
-- Buy a stock not on the pre-market watchlist during market hours
-- Hold a tactical position beyond 3 trading days without reclassifying it
+-----------------------------------------------------------------------------
+- Trade non-sharia-compliant stocks
+- Buy or add when hard entry filters are triggered
+- Buy purely because of momentum
+- Sell purely because the price went down
+- Force capital deployment when opportunities are weak
+- Open meaningless token positions
+- Let one position exceed 14% of portfolio value
+- Treat AI hype as a thesis without business-economic evidence
 
-─────────────────────────────────────────────────────────────────────────────
+-----------------------------------------------------------------------------
 BENCHMARK
-─────────────────────────────────────────────────────────────────────────────
-Daily performance is compared to SPY (S&P 500 ETF).
-Alpha (portfolio return − SPY return) is tracked daily, weekly, and
-cumulatively in the Supabase benchmark table and displayed on the dashboard.
+-----------------------------------------------------------------------------
+Daily performance is compared to SPY for tracking, but Saboor is judged over
+multi-year periods. Daily alpha is a measurement, not a trading signal.
+
+Alpha, cumulative return, portfolio value, and open positions are tracked in
+Supabase and displayed on the dashboard.

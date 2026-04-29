@@ -1,14 +1,13 @@
 """
 EOD phase — 3:30 PM ET
-Closes remaining tactical positions, records benchmark, sends Telegram EOD report.
+Records benchmark performance and sends Telegram EOD report.
 """
 from datetime import date
-from tools.alpaca_client import get_portfolio, get_spy_return_today, get_price, place_order
+from tools.alpaca_client import get_portfolio, get_spy_return_today
 from agents.notifier import send_eod_report
 from db.queries import (
-    get_open_positions, get_position_by_ticker, close_position,
-    log_decision, save_benchmark, get_weekly_alpha, get_todays_decisions,
-    get_previous_portfolio_value, sync_portfolio
+    get_open_positions, log_decision, save_benchmark, get_weekly_alpha,
+    get_todays_decisions, get_previous_portfolio_value, sync_portfolio
 )
 
 
@@ -20,25 +19,6 @@ def run():
 
     log_decision("eod", None, "phase_start", "EOD phase started")
 
-    # Force-close all remaining tactical positions
-    tactical = get_open_positions(bucket="tactical")
-    tactical_closed = 0
-
-    for pos in tactical:
-        try:
-            current_price = get_price(pos["ticker"])
-            pnl_pct = (current_price - pos["entry_price"]) / pos["entry_price"]
-            reason = "eod_underperforming" if pnl_pct <= 0 else "eod_close"
-            place_order(pos["ticker"], "sell", pos["shares"])
-            close_position(pos["ticker"], current_price, reason)
-            log_decision("eod", pos["ticker"], "eod_close", reason)
-            print(f"  Closed tactical {pos['ticker']} @ ${current_price:.2f} ({pnl_pct:+.1%})")
-            tactical_closed += 1
-        except Exception as e:
-            log_decision("eod", pos["ticker"], "close_error", str(e))
-            print(f"  CLOSE ERROR {pos['ticker']}: {e}")
-
-    # Final portfolio snapshot
     try:
         portfolio = get_portfolio()
         sync_portfolio(
@@ -50,33 +30,32 @@ def run():
         print(f"Portfolio sync failed: {e}")
         return
 
-    # Benchmark
     spy_return = get_spy_return_today()
-    prev_value = get_previous_portfolio_value()
+    prev_value = get_previous_portfolio_value(before_date=today)
     daily_return = (
         (portfolio["total_value"] - prev_value) / prev_value * 100
         if prev_value else 0.0
     )
 
     save_benchmark(today, portfolio["total_value"], daily_return, spy_return * 100)
-
     weekly_alpha = get_weekly_alpha()
 
-    # Trade counts for the day
     decisions = get_todays_decisions()
     buys = sum(1 for d in decisions if d["action"] == "buy")
-    sells = sum(1 for d in decisions if d["action"] in ("sell", "forced_close", "eod_close"))
+    adds = sum(1 for d in decisions if d["action"] == "add")
+    trims = sum(1 for d in decisions if d["action"] == "trim")
+    exits = sum(1 for d in decisions if d["action"] == "exit")
+    open_positions = get_open_positions()
 
-    # EOD Telegram report
-    core_positions = get_open_positions(bucket="core")
     send_eod_report(
         portfolio_value=portfolio["total_value"],
         daily_return=daily_return,
         spy_return=spy_return * 100,
-        core_count=len(core_positions),
-        tactical_closed=tactical_closed,
+        position_count=len(open_positions),
         buys=buys,
-        sells=sells,
+        adds=adds,
+        trims=trims,
+        exits=exits,
         weekly_alpha=weekly_alpha,
         date_str=today.strftime("%b %d, %Y"),
     )
@@ -85,7 +64,7 @@ def run():
         f"\nEOD complete — Portfolio: ${portfolio['total_value']:,.0f} "
         f"({daily_return:+.2f}% vs SPY {spy_return*100:+.2f}%)"
     )
-    print(f"Weekly alpha: {weekly_alpha:+.2f}%")
+    print(f"Open positions: {len(open_positions)} | Weekly alpha: {weekly_alpha:+.2f}%")
 
     log_decision(
         "eod", None, "phase_complete",

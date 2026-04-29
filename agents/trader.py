@@ -5,49 +5,50 @@ from tools.claude_client import complete
 from tools.alpaca_client import place_order, get_price
 from agents.risk_guardian import validate_order, max_shares_for_position
 from data.universe import get_universe
-from db.queries import save_position, log_decision, mark_watchlist_acted, get_position_by_ticker, close_position
+from db.queries import (
+    save_position,
+    reduce_position,
+    log_decision,
+    mark_watchlist_acted,
+    get_position_by_ticker,
+    close_position,
+)
 
-TRADER_SYSTEM = """You are Saboor's Trader. Make final buy/sell/hold decisions for today's session.
+TRADER_SYSTEM = """You are Saboor's Trader. Saboor is a Buffett-style halal investing system with one portfolio and no tactical bucket.
 
-You think like Warren Buffett: only buy what makes sense at this price with a clear thesis.
-Momentum confirms timing — it never overrides a weak fundamental case.
+You receive refreshed ownership candidates plus current open positions.
 
-BUYING APPROACH — build a high-conviction portfolio:
-- Buy as many watchlist stocks as position limits allow (target up to 20 positions: 17 Core + 3 Tactical)
-- Prefer CORE positions — stable, multi-week holds that compound over time
-- Add TACTICAL positions only when momentum is exceptionally strong
-- Deploy capital fully — idle cash does not beat the market
-- Position sizes are set by the Analyst's conviction score — trust them
+Valid actions:
+- buy: open a new position from today's refreshed candidates
+- add: increase an existing position only if refreshed candidate data supports the thesis
+- hold: do nothing
+- trim: reduce a position when valuation, concentration, conviction, or better opportunities justify it
+- exit: close a position when thesis breaks, sharia status changes, intrinsic value falls, or forward expected return is unattractive
 
-HOLDING APPROACH — patience is the edge:
-- NEVER sell because a price dropped. A stock down 5%, 10%, even 15% is noise if the thesis is intact.
-- The only valid reason to sell is a broken thesis: earnings collapse, business model disruption, or sector destruction.
-- A stock being up is NOT a reason to sell core — let winners run.
-- Conviction in the original thesis > short-term price anxiety.
+Rules:
+- Never buy or add because of momentum alone.
+- Never sell, trim, or exit only because price dropped.
+- Cash is valid. Do not force deployment.
+- Do not recommend token positions that are too small to matter.
+- Respect the 14% hard cap that Risk Guardian will enforce.
+- Treat AI as business economics, not hype.
 
-SELLING:
-- Tactical: handled automatically at EOD (3-day max hold). Do not sell tactical intraday on price alone.
-- Core: hold through all volatility. Exit only when the fundamental reason you bought it no longer exists.
-
-OUTPUT: JSON only.
+OUTPUT JSON ONLY:
 {
-  "buys":  [{"ticker": "...", "shares": number, "bucket": "core"|"tactical", "thesis": "..."}],
-  "sells": [{"ticker": "...", "reason": "..."}],
-  "holds": [{"ticker": "...", "reason": "..."}]
+  "actions": [
+    {
+      "action": "buy" | "add" | "hold" | "trim" | "exit",
+      "ticker": "AAPL",
+      "shares": number,
+      "trim_pct": number,
+      "thesis": "required for buy/add",
+      "reason": "required for hold/trim/exit"
+    }
+  ]
 }"""
 
-
-# FIX [CRITICAL C-2]: Validate Claude response fields before placing Alpaca orders.
-# REASON: Claude is a non-deterministic upstream and must be treated as
-#         untrusted input. Without validation, a hallucinated ticker, an
-#         invalid bucket value, or an inflated share count could be sent
-#         straight to Alpaca, resulting in failed orders or — worse —
-#         oversized positions that break the risk model.
-# SOLUTION: Constrain every Claude-supplied field to a strict allow-list
-#         (universe membership, regex on ticker, bucket enum) and clamp
-#         shares to the risk-model-derived max — never trust Claude's count.
 _TICKER_RE = re.compile(r"^[A-Z]{1,5}$")
-_VALID_BUCKETS = ("core", "tactical")
+_VALID_ACTIONS = ("buy", "add", "hold", "trim", "exit")
 
 
 def _is_valid_ticker(ticker, universe: set[str]) -> bool:
@@ -58,144 +59,180 @@ def _is_valid_ticker(ticker, universe: set[str]) -> bool:
     )
 
 
+def _coerce_shares(value) -> int:
+    try:
+        return max(int(float(value)), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _coerce_trim_pct(value) -> float:
+    try:
+        return min(max(float(value), 0.0), 100.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _actions_from_decisions(decisions: dict) -> list[dict]:
+    if isinstance(decisions, dict) and isinstance(decisions.get("actions"), list):
+        return decisions["actions"]
+
+    # Backward-compatible parsing if Claude returns the old shape.
+    actions = []
+    for buy in (decisions or {}).get("buys", []):
+        actions.append({**buy, "action": "buy"})
+    for sell in (decisions or {}).get("sells", []):
+        actions.append({**sell, "action": "exit"})
+    for hold in (decisions or {}).get("holds", []):
+        actions.append({**hold, "action": "hold"})
+    return actions
+
+
 def execute_trades(watchlist: list[dict], open_positions: list[dict]) -> dict:
     """
-    Ask Claude to make decisions, then execute approved orders through Risk Guardian → Alpaca.
-    Returns counts of executed buys and sells.
+    Ask Claude for Buy/Add/Hold/Trim/Exit decisions, then execute approved orders.
     """
     universe = set(get_universe())
-
-    # Index watchlist by ticker for O(1) lookup of analyst-supplied weights and scores.
     watchlist_by_ticker = {item["ticker"]: item for item in watchlist if "ticker" in item}
 
-    # Enrich watchlist with live price and analyst-weighted share quantity
-    enriched_watchlist = []
+    enriched_candidates = []
     for item in watchlist:
+        ticker = item.get("ticker")
         try:
-            price = get_price(item["ticker"])
+            price = get_price(ticker)
             weight = item.get("position_weight_pct")
-            max_shares = max_shares_for_position(price, weight)
-            enriched_watchlist.append({
+            max_shares = max_shares_for_position(price, weight, ticker=ticker)
+            enriched_candidates.append({
                 **item,
                 "current_price": price,
-                "max_shares": max_shares,
-                "target_allocation_pct": weight or 8,
+                "max_additional_shares": max_shares,
+                "target_allocation_pct": min(weight or 6, 14),
             })
         except Exception as e:
-            print(f"  Price fetch failed for {item['ticker']}: {e}")
+            print(f"  Price fetch failed for {ticker}: {e}")
 
     user_msg = (
-        f"Make trading decisions.\n\n"
-        f"WATCHLIST:\n{json.dumps(enriched_watchlist, indent=2)}\n\n"
+        "Make portfolio decisions under the Buffett-style strategy.\n\n"
+        f"REFRESHED CANDIDATES:\n{json.dumps(enriched_candidates, indent=2)}\n\n"
         f"OPEN POSITIONS:\n{json.dumps(open_positions, indent=2)}\n\n"
-        "Return JSON with buys/sells/holds arrays."
+        "Return JSON with an actions array."
     )
 
     try:
         decisions = complete(TRADER_SYSTEM, user_msg, as_json=True)
     except Exception as e:
         log_decision("market_open", None, "trader_error", str(e))
-        return {"buys": 0, "sells": 0}
+        return {"buys": 0, "adds": 0, "trims": 0, "exits": 0, "holds": 0, "sells": 0}
 
-    executed_buys, executed_sells = 0, 0
+    counts = {"buys": 0, "adds": 0, "trims": 0, "exits": 0, "holds": 0, "sells": 0}
 
-    for buy in decisions.get("buys", []):
-        ticker = buy.get("ticker")
-        bucket = buy.get("bucket", "tactical")
-        thesis = buy.get("thesis", "")
+    for item in _actions_from_decisions(decisions):
+        action = str(item.get("action", "")).lower()
+        ticker = item.get("ticker")
 
-        # FIX [CRITICAL C-2]: Validate ticker is in our universe AND well-formed.
+        if action not in _VALID_ACTIONS:
+            log_decision("market_open", ticker, "action_rejected", f"invalid action: {action!r}")
+            continue
         if not _is_valid_ticker(ticker, universe):
-            log_decision("market_open", ticker, "buy_rejected", f"invalid ticker: {ticker!r}")
+            log_decision("market_open", ticker, f"{action}_rejected", f"invalid ticker: {ticker!r}")
             print(f"  REJECTED invalid ticker: {ticker!r}")
             continue
 
-        # FIX [CRITICAL C-2]: Constrain bucket to the exact enum.
-        if bucket not in _VALID_BUCKETS:
-            log_decision("market_open", ticker, "buy_rejected", f"invalid bucket: {bucket!r}")
-            print(f"  REJECTED {ticker}: invalid bucket {bucket!r}")
+        if action == "hold":
+            reason = item.get("reason", "thesis intact")
+            log_decision("market_open", ticker, "hold", reason)
+            counts["holds"] += 1
             continue
 
         try:
             price = get_price(ticker)
-            wl_item = watchlist_by_ticker.get(ticker, {})
-            weight = wl_item.get("position_weight_pct")
-
-            # FIX [CRITICAL C-2]: Cap shares to risk-model maximum — never
-            # trust Claude's share count. Treat its count as an upper bound
-            # we may further reduce, never as a number we honor as-is.
-            risk_max_shares = max_shares_for_position(price, weight)
-            requested_shares = buy.get("shares", 0)
-            try:
-                requested_shares = int(requested_shares)
-            except (TypeError, ValueError):
-                requested_shares = 0
-            shares = min(requested_shares, risk_max_shares)
-
-            if shares <= 0:
-                log_decision("market_open", ticker, "buy_rejected", "no shares (risk-cap or 0 requested)")
-                print(f"  REJECTED {ticker}: 0 shares after risk cap")
-                continue
-
-            approved, reason = validate_order(ticker, "buy", shares, price, bucket, weight)
-
-            if not approved:
-                log_decision("market_open", ticker, "buy_rejected", reason)
-                print(f"  REJECTED {ticker}: {reason}")
-                continue
-
-            order = place_order(ticker, "buy", shares)
-
-            # FIX [HIGH H-5]: Pass scores when saving positions so the
-            # decisions log and dashboard retain the analyst signal that
-            # drove the entry.
-            save_position(
-                ticker,
-                bucket,
-                shares,
-                price,
-                thesis,
-                date.today(),
-                quality_score=wl_item.get("quality_score"),
-                momentum_score=wl_item.get("momentum_score"),
-                combined_score=wl_item.get("combined_score"),
-            )
-            mark_watchlist_acted(ticker)
-            log_decision("market_open", ticker, "buy", thesis, order_id=order.get("id"))
-            print(f"  BOUGHT {shares} {ticker} @ ${price:.2f} ({bucket})")
-            executed_buys += 1
-
-        except Exception as e:
-            log_decision("market_open", ticker, "buy_error", str(e))
-            print(f"  BUY ERROR {ticker}: {e}")
-
-    for sell in decisions.get("sells", []):
-        ticker = sell.get("ticker")
-        reason = sell.get("reason", "trader_decision")
-
-        # FIX [CRITICAL C-2]: Validate sell ticker too — the same untrusted-input
-        # threat applies. We further require an open position, so universe
-        # membership is implicitly enforced, but we still want a fast-fail
-        # on malformed strings before they hit any code path.
-        if not _is_valid_ticker(ticker, universe):
-            log_decision("market_open", ticker, "sell_rejected", f"invalid ticker: {ticker!r}")
-            print(f"  REJECTED invalid sell ticker: {ticker!r}")
-            continue
-
-        try:
             pos = get_position_by_ticker(ticker)
-            if not pos:
+            wl_item = watchlist_by_ticker.get(ticker)
+
+            if action in ("buy", "add"):
+                if not wl_item:
+                    log_decision("market_open", ticker, f"{action}_rejected", "not in refreshed candidate list")
+                    print(f"  REJECTED {ticker}: not in refreshed candidate list")
+                    continue
+
+                weight = wl_item.get("position_weight_pct")
+                risk_max_shares = max_shares_for_position(price, weight, ticker=ticker)
+                requested = _coerce_shares(item.get("shares"))
+                shares = min(requested or risk_max_shares, risk_max_shares)
+
+                if shares <= 0:
+                    log_decision("market_open", ticker, f"{action}_rejected", "0 shares after 14% cap")
+                    print(f"  REJECTED {ticker}: 0 shares after 14% cap")
+                    continue
+
+                approved, reason = validate_order(ticker, action, shares, price, "core", weight)
+                if not approved:
+                    log_decision("market_open", ticker, f"{action}_rejected", reason)
+                    print(f"  REJECTED {ticker}: {reason}")
+                    continue
+
+                order = place_order(ticker, "buy", shares)
+                thesis = item.get("thesis") or wl_item.get("thesis", "")
+                save_position(
+                    ticker,
+                    "core",
+                    shares,
+                    price,
+                    thesis,
+                    date.today(),
+                    quality_score=wl_item.get("quality_score"),
+                    momentum_score=wl_item.get("momentum_score"),
+                    combined_score=wl_item.get("combined_score"),
+                )
+                mark_watchlist_acted(ticker)
+                actual_action = "add" if pos else "buy"
+                log_decision("market_open", ticker, actual_action, thesis, order_id=order.get("id"))
+                print(f"  {actual_action.upper()} {shares} {ticker} @ ${price:.2f}")
+                counts["adds" if pos else "buys"] += 1
                 continue
 
-            place_order(ticker, "sell", pos["shares"])
-            close_price = get_price(ticker)
-            close_position(ticker, close_price, reason)
-            log_decision("market_open", ticker, "sell", reason)
-            print(f"  SOLD {ticker}: {reason}")
-            executed_sells += 1
+            if not pos:
+                log_decision("market_open", ticker, f"{action}_rejected", "no open position")
+                continue
+
+            if action == "trim":
+                shares = _coerce_shares(item.get("shares"))
+                if shares <= 0:
+                    trim_pct = _coerce_trim_pct(item.get("trim_pct"))
+                    shares = int(float(pos.get("shares", 0) or 0) * trim_pct / 100)
+                if shares <= 0:
+                    log_decision("market_open", ticker, "trim_rejected", "no shares specified")
+                    continue
+
+                approved, reason = validate_order(ticker, "trim", shares, price)
+                if not approved:
+                    log_decision("market_open", ticker, "trim_rejected", reason)
+                    continue
+
+                place_order(ticker, "sell", shares)
+                reduce_position(ticker, shares, price, item.get("reason", "valuation/concentration trim"))
+                log_decision("market_open", ticker, "trim", item.get("reason", "trim"))
+                print(f"  TRIMMED {shares} {ticker} @ ${price:.2f}")
+                counts["trims"] += 1
+                counts["sells"] += 1
+                continue
+
+            if action == "exit":
+                shares = float(pos.get("shares", 0) or 0)
+                approved, reason = validate_order(ticker, "exit", shares, price)
+                if not approved:
+                    log_decision("market_open", ticker, "exit_rejected", reason)
+                    continue
+
+                place_order(ticker, "sell", shares)
+                close_position(ticker, price, item.get("reason", "strategy_exit"))
+                log_decision("market_open", ticker, "exit", item.get("reason", "strategy_exit"))
+                print(f"  EXITED {ticker} @ ${price:.2f}")
+                counts["exits"] += 1
+                counts["sells"] += 1
 
         except Exception as e:
-            log_decision("market_open", ticker, "sell_error", str(e))
-            print(f"  SELL ERROR {ticker}: {e}")
+            log_decision("market_open", ticker, f"{action}_error", str(e))
+            print(f"  {action.upper()} ERROR {ticker}: {e}")
 
-    return {"buys": executed_buys, "sells": executed_sells}
+    return counts

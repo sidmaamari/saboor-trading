@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Saboor — Autonomous Halal Trading Agent
+Saboor — Autonomous Halal Investing Agent
 Usage: python main.py <phase>
 
 Phases:
   init       Verify the Supabase schema (tables are managed remotely)
-  premarket  7:30 AM — build today's watchlist
-  open       9:35 AM — execute trades
-  midday     12:00 PM — reassess positions
-  eod        3:30 PM — close tactical positions, send report
+  premarket  7:30 AM — sharia screen, research, build ownership candidates
+  open       9:35 AM — review candidates and open positions, execute decisions
+  midday     12:00 PM — monitor portfolio and urgent thesis/compliance changes
+  eod        3:30 PM — record benchmark, send EOD report
 """
 import sys
 from dotenv import load_dotenv

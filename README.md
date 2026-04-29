@@ -1,50 +1,89 @@
-# Saboor — Autonomous Halal Trading Agent
+# Saboor - Autonomous Halal Investing Agent
 
-Saboor is an AI-powered autonomous trading system designed to beat the S&P 500 through disciplined, sharia-compliant investing. It uses Claude Opus 4.7 as its decision engine, yfinance for fundamentals research, and Alpaca for trade execution.
+Saboor is an AI-powered investing system designed to beat the S&P 500 over time through disciplined, sharia-compliant, Buffett-style ownership of high-quality businesses. It uses Claude Opus 4.7 as its decision engine, yfinance for fundamentals research, Alpaca for paper-trading execution, and Supabase for portfolio records and performance tracking.
 
-**Currently running on Alpaca paper trading (simulated money).**
+**Currently running on Alpaca paper trading. This is not financial advice.**
 
 ---
 
 ## How It Works
 
-Saboor runs four phases every trading day, fully automated via cron:
+Saboor runs one strategy: long-term quality investing. It does not run a separate tactical trading sleeve.
 
 | Time (Oman) | Time (ET) | Phase | What Happens |
 |---|---|---|---|
-| 3:30 PM | 7:30 AM | Pre-market | Sharia screen → yfinance research → Analyst builds ranked watchlist |
-| 5:35 PM | 9:35 AM | Market Open | Trader executes buys from watchlist; Risk Guardian validates each order |
-| 8:00 PM | 12:00 PM | Midday | Closes tactical positions that hit their 3-day max hold |
-| 11:30 PM | 3:30 PM | EOD | Force-closes remaining tactical positions; sends Telegram report |
+| 3:30 PM | 7:30 AM | Pre-market | Sharia screen -> yfinance research -> Analyst builds or refreshes candidate list |
+| 5:35 PM | 9:35 AM | Market Open | Analyst/Trader reviews entries, adds, trims, exits; Risk Guardian validates orders |
+| 8:00 PM | 12:00 PM | Midday | Reviews portfolio risk, thesis alerts, and urgent compliance/business changes |
+| 11:30 PM | 3:30 PM | EOD | Records benchmark performance and sends Telegram report |
 
 ---
 
 ## Strategy
 
-Quality-first (Buffett lens) + momentum timing. See [strategy.readme](strategy.readme) for the full scoring model and rules.
+Saboor thinks like a patient business owner. It buys understandable, sharia-compliant companies with durable economics, strong balance sheets, attractive reinvestment opportunities, and sensible prices. Momentum can help with entry timing, but it is never the reason to own a stock.
 
-**The Analyst has full authority.** Within the defined rules, it decides what to buy, how much weight to assign, and when to exit. No mechanical override will contradict a well-reasoned Analyst decision.
+The Analyst has discretion inside strict boundaries. It may recommend `Buy`, `Add`, `Hold`, `Trim`, or `Exit`, but every action must be justified through business quality, intrinsic value, margin of safety, forward expected return, portfolio concentration, and sharia compliance.
 
-### Entry Rules (enforced in code — cannot be overridden)
+### Hard Rules
 
-- RSI > 78 → blocked (overbought)
-- Price > 150% above MA200 → blocked (over-extended)
-- FCF negative + PE > 150x + ROE negative → blocked (pure speculation)
-- Non-sharia-compliant business → blocked
+These rules are enforced in code and cannot be overridden by the Analyst:
 
-### Portfolio Structure
+- Non-sharia-compliant business -> blocked
+- RSI > 78 -> blocked for new buys/adds
+- Price > 150% above MA200 -> blocked for new buys/adds
+- FCF negative + PE > 150x + ROE negative -> blocked as pure speculation
+- Single position size > 14% of portfolio -> blocked
 
-| Bucket | Max Positions | Hold Duration | Exit Rule |
-|---|---|---|---|
-| Core | 17 | Weeks to months | Only when fundamental thesis breaks |
-| Tactical | 3 | Max 3 trading days | Auto-closed at EOD on day 3 |
-| **Total** | **20** | | |
+### Portfolio Philosophy
+
+Saboor does not target a fixed number of positions. Position count is an output of conviction, account size, valuation, and available opportunity.
+
+Suggested portfolio shape:
+
+| Account Size | Typical Holdings |
+|---|---|
+| Under $5k | 3-5 |
+| $5k-$25k | 4-8 |
+| $25k-$100k | 5-10 |
+| $100k+ | 6-12 |
+
+These are guidance ranges, not quotas. If only a few excellent opportunities exist, Saboor may hold only those and keep cash. If nothing is compelling, cash is a valid position.
 
 ### Position Sizing
 
-Assigned purely by the Analyst based on `combined_score` and conviction. No hard cap on any single position. Company size and fame are irrelevant — a small company with a score of 90 gets more weight than a mega-cap with a score of 65.
+The Analyst assigns position weights based on conviction, business quality, valuation, and risk. There is no formal minimum percentage, but Saboor should avoid opening token positions that are too small to matter.
 
-Target: **80–95% of capital deployed at all times.**
+Maximum position size: **14% of portfolio value**.
+
+The system may average up or average down only after a fresh review confirms:
+
+- the thesis is intact or stronger
+- the company remains sharia-compliant
+- the valuation is still reasonable
+- the forward expected return remains attractive
+- the resulting position stays within the 14% cap
+
+### Selling, Trimming, and Valuation
+
+Saboor never sells just because a stock price dropped. Price movement is information, not a thesis.
+
+Valid reasons to `Trim`:
+
+- the business remains excellent, but price is materially above intrinsic value
+- expected 3-5 year forward return has fallen below the hurdle rate
+- the position has grown too large relative to risk or conviction
+- a clearly superior opportunity exists
+
+Valid reasons to `Exit`:
+
+- the business thesis breaks
+- sharia status changes
+- management, balance sheet, moat, or industry structure deteriorates
+- intrinsic value falls materially
+- forward expected return is unattractive and capital is better used elsewhere
+
+Saboor judges overvaluation through an intrinsic-value band, not market mood. The Analyst should estimate bear/base/bull value ranges and compare today's price to expected business cash generation.
 
 ---
 
@@ -64,74 +103,76 @@ cp .env.example .env.local
 ```
 
 Required keys:
-- `ANTHROPIC_API_KEY` — [console.anthropic.com](https://console.anthropic.com)
-- `ALPACA_API_KEY` + `ALPACA_SECRET_KEY` — [alpaca.markets](https://alpaca.markets) (paper account)
-- `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` — create via [@BotFather](https://t.me/BotFather)
-- `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` — [supabase.com](https://supabase.com)
+
+- `ANTHROPIC_API_KEY` - [console.anthropic.com](https://console.anthropic.com)
+- `ALPACA_API_KEY` + `ALPACA_SECRET_KEY` - [alpaca.markets](https://alpaca.markets) paper account
+- `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` - create via [@BotFather](https://t.me/BotFather)
+- `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` - [supabase.com](https://supabase.com)
 
 ### 3. Set up Supabase schema
 
 Run `db/supabase_schema.sql` in the Supabase SQL Editor.
 
-### 4. Schedule with cron
+### 4. Schedule automation
 
 ```bash
-bash deploy/install_cron.sh   # on a Linux VPS (UTC times)
-# OR — on Mac, crontab is already configured in Oman local time
+bash deploy/install_cron.sh
 ```
+
+The VPS cron schedule uses UTC. Local macOS scheduler files live in `launchd/`.
 
 ---
 
 ## Running Manually
 
 ```bash
-python main.py premarket   # Build today's watchlist + send Telegram
-python main.py open        # Execute trades
-python main.py midday      # Reassess / close 3-day tactical holds
-python main.py eod         # Force-close tacticals + send EOD report
+python main.py premarket   # Build or refresh candidate list
+python main.py open        # Review and execute buys/adds/trims/exits
+python main.py midday      # Monitor portfolio and urgent thesis/compliance changes
+python main.py eod         # Record benchmark + send EOD report
 ```
 
 ---
 
 ## Project Structure
 
-```
+```text
 saboor-trading/
-├── main.py                  # CLI entry point (premarket / open / midday / eod)
+├── main.py                  # CLI entry point
 ├── strategy.readme          # Full strategy documentation
 ├── agents/
-│   ├── analyst.py           # Claude scoring model + watchlist builder
-│   ├── trader.py            # Claude buy/sell decision maker
-│   ├── risk_guardian.py     # Entry validation (RSI, MA200, position limits)
+│   ├── analyst.py           # Claude scoring and business analysis
+│   ├── trader.py            # Claude portfolio action decision maker
+│   ├── risk_guardian.py     # Non-negotiable risk and entry validation
 │   ├── notifier.py          # Telegram notifications
 │   └── researcher.py        # yfinance fundamentals fetcher
 ├── phases/
-│   ├── premarket.py         # 3:30 PM Oman
-│   ├── market_open.py       # 5:35 PM Oman
-│   ├── midday.py            # 8:00 PM Oman
-│   └── eod.py               # 11:30 PM Oman
+│   ├── premarket.py
+│   ├── market_open.py
+│   ├── midday.py
+│   └── eod.py
 ├── tools/
-│   ├── alpaca_client.py     # Alpaca REST API wrapper
-│   ├── claude_client.py     # Anthropic API wrapper (with prompt caching)
-│   ├── yfinance_client.py   # Free fundamentals from Yahoo Finance
-│   ├── sharia_screener.py   # Claude-based AAOIFI compliance gate
-│   └── technical.py         # Shared RSI + MA200 calculations
+│   ├── alpaca_client.py
+│   ├── claude_client.py
+│   ├── yfinance_client.py
+│   ├── sharia_screener.py
+│   └── technical.py
 ├── db/
-│   ├── supabase_client.py   # Supabase singleton client
-│   ├── queries.py           # All database operations
-│   └── supabase_schema.sql  # PostgreSQL schema
+│   ├── supabase_client.py
+│   ├── queries.py
+│   └── supabase_schema.sql
 ├── data/
-│   └── universe.py          # ~224 S&P 500 + NASDAQ 100 tickers
-├── dashboard/               # Next.js performance dashboard (Vercel)
-├── deploy/                  # VPS setup + cron install scripts
-└── launchd/                 # macOS scheduler plists
+│   └── universe.py
+├── dashboard/
+├── deploy/
+└── launchd/
 ```
 
 ---
 
 ## Dashboard
 
-Live performance vs SPY is tracked at the Vercel dashboard. Shows cumulative return chart, daily alpha, and live portfolio breakdown.
+Live performance vs SPY is tracked on the dashboard. It shows cumulative return, daily alpha, portfolio value, and open positions.
 
 ---
 

@@ -36,9 +36,9 @@ def fetch_fundamentals(ticker: str) -> dict:
     peg_ratio = _safe(info, "pegRatio")
 
     # Business context
-    business_summary = (info.get("longBusinessSummary") or "")[:400]
-    sector = info.get("sector", "Unknown")
-    industry = info.get("industry", "Unknown")
+    business_summary = _sanitize_text(info.get("longBusinessSummary") or "", max_len=500)
+    sector = _sanitize_text(info.get("sector", "Unknown"), max_len=80)
+    industry = _sanitize_text(info.get("industry", "Unknown"), max_len=120)
 
     # Recent news headlines (last 7 days, max 5)
     recent_news = _get_news(t)
@@ -99,16 +99,20 @@ _HEADLINE_BLOCKED_CHARS = ('"', "\n", "]", "}")
 _HEADLINE_MAX_LEN = 120
 
 
-def _sanitize_headline(raw: str) -> str:
+def _sanitize_text(raw: str, max_len: int) -> str:
     if not isinstance(raw, str):
         return ""
     cleaned = raw
     for ch in _HEADLINE_BLOCKED_CHARS:
         cleaned = cleaned.replace(ch, " ")
     cleaned = cleaned.strip()
-    if len(cleaned) > _HEADLINE_MAX_LEN:
-        cleaned = cleaned[:_HEADLINE_MAX_LEN]
+    if len(cleaned) > max_len:
+        cleaned = cleaned[:max_len]
     return cleaned
+
+
+def _sanitize_headline(raw: str) -> str:
+    return _sanitize_text(raw, _HEADLINE_MAX_LEN)
 
 
 def _get_news(ticker_obj: yf.Ticker) -> list[str]:

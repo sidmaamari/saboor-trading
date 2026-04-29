@@ -1,13 +1,11 @@
 """
 Market open phase — 9:35 AM ET
-Executes trades from today's watchlist. Risk Guardian gates every order.
+Reviews candidates and open positions. Risk Guardian gates every order.
 """
 from datetime import date
 from tools.alpaca_client import get_portfolio
-from agents.risk_guardian import is_daily_loss_cap_hit
 from agents.trader import execute_trades
-from agents.notifier import send_daily_loss_cap_alert
-from db.queries import get_todays_watchlist, get_open_positions, log_decision, get_daily_pl, sync_portfolio
+from db.queries import get_todays_watchlist, get_open_positions, log_decision, sync_portfolio
 
 
 def run():
@@ -31,31 +29,26 @@ def run():
         print(f"Portfolio sync failed: {e}")
         return
 
-    # Hard stop — daily loss cap check
-    if is_daily_loss_cap_hit():
-        pl = get_daily_pl()
-        send_daily_loss_cap_alert(pl, portfolio["total_value"])
-        log_decision("market_open", None, "halted", "Daily loss cap hit — no new trades")
-        print("🛑 Daily loss cap hit. Trading halted.")
-        return
-
     # Load watchlist and current positions
     watchlist = get_todays_watchlist()
     open_positions = get_open_positions()
 
-    if not watchlist:
-        log_decision("market_open", None, "no_watchlist", "No watchlist available")
-        print("No watchlist for today — run premarket phase first.")
+    if not watchlist and not open_positions:
+        log_decision("market_open", None, "no_candidates_or_positions", "No candidates or positions to review")
+        print("No candidates or open positions to review — run premarket first.")
         return
 
-    print(f"\nWatchlist: {len(watchlist)} stocks | Open positions: {len(open_positions)}")
+    print(f"\nCandidates: {len(watchlist)} stocks | Open positions: {len(open_positions)}")
 
     # Execute
     result = execute_trades(watchlist, open_positions)
 
     log_decision(
         "market_open", None, "phase_complete",
-        f"Executed {result['buys']} buys, {result['sells']} sells"
+        f"Buys {result['buys']}, adds {result['adds']}, trims {result['trims']}, exits {result['exits']}, holds {result['holds']}"
     )
-    print(f"\nDone: {result['buys']} buys, {result['sells']} sells")
+    print(
+        f"\nDone: {result['buys']} buys, {result['adds']} adds, "
+        f"{result['trims']} trims, {result['exits']} exits, {result['holds']} holds"
+    )
     return result

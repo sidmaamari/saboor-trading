@@ -1,27 +1,19 @@
 from tools.alpaca_client import get_bars
 from tools.technical import calculate_signals
-from db.queries import get_portfolio_value, get_open_positions_count
+from db.queries import get_portfolio_value, get_position_by_ticker
 
-MAX_CORE_POSITIONS = 17
-MAX_TACTICAL_POSITIONS = 3
-TACTICAL_MAX_DAYS = 3
-
-RSI_BLOCK_THRESHOLD = 78       # don't buy overbought stocks
-MA200_EXTENSION_BLOCK = 1.5    # don't buy >150% above MA200
+MAX_POSITION_PCT = 0.14
+RSI_BLOCK_THRESHOLD = 78
+MA200_EXTENSION_BLOCK = 1.5
 
 
 def _live_entry_check(ticker: str) -> tuple[bool, str]:
-    """Re-checks RSI and MA200 extension at order time using fresh bars."""
+    """Re-check RSI and MA200 extension for new buys/adds using fresh bars."""
     try:
         bars = get_bars(ticker, days=210)
         if len(bars) < 55:
             return True, "ok"
 
-        # FIX [HIGH H-12]: Use shared calculator instead of duplicating the math here.
-        # REASON: The Analyst and Risk Guardian had two divergent copies of
-        #         the RSI/MA200 calculation, which is a correctness hazard —
-        #         a fix in one is silently absent from the other.
-        # SOLUTION: Single source of truth in tools/technical.py.
         signals = calculate_signals(
             [b["close"] for b in bars],
             [b["volume"] for b in bars],
@@ -31,82 +23,84 @@ def _live_entry_check(ticker: str) -> tuple[bool, str]:
         ma200 = signals["ma200"]
 
         if rsi > RSI_BLOCK_THRESHOLD:
-            return False, f"RSI {rsi:.0f} > {RSI_BLOCK_THRESHOLD} at order time — overbought, skipping"
+            return False, f"RSI {rsi:.0f} > {RSI_BLOCK_THRESHOLD}; buy/add blocked"
         if ma200 > 0 and current > ma200 * (1 + MA200_EXTENSION_BLOCK):
             ext = (current / ma200 - 1) * 100
-            return False, f"Price {ext:.0f}% above MA200 at order time — too extended, skipping"
+            return False, f"Price {ext:.0f}% above MA200; buy/add blocked"
         return True, "ok"
     except Exception as e:
-        # FIX [CRITICAL C-4]: Fail closed, not open.
-        # REASON: The previous behavior swallowed every error and returned
-        #         (True, "ok"), meaning a transient data-feed issue would
-        #         silently bypass the live entry check and let a possibly
-        #         overbought trade through. Capital preservation requires
-        #         the opposite default — when in doubt, don't trade.
-        # SOLUTION: Block the entry on any exception and surface the error
-        #         in the rejection reason so it appears in the decision log.
-        return False, f"entry check failed ({e}) — skipping to protect capital"
+        return False, f"entry check failed ({e}); skipping to protect capital"
+
+
+def _position_value_after_order(ticker: str, shares: float, price: float, side: str) -> float:
+    current = get_position_by_ticker(ticker)
+    current_shares = float(current.get("shares", 0)) if current else 0.0
+    if side in ("buy", "add"):
+        return (current_shares + shares) * price
+    if side in ("sell", "trim"):
+        return max(current_shares - shares, 0) * price
+    return current_shares * price
 
 
 def validate_order(
-    ticker: str, side: str, shares: float, price: float, bucket: str,
+    ticker: str,
+    side: str,
+    shares: float,
+    price: float,
+    bucket: str = "core",
     position_weight_pct: float = None,
 ) -> tuple[bool, str]:
     """
-    Final gate before any buy order touches Alpaca.
-    Returns (approved: bool, reason: str).
-    Sell orders are always approved — never block an exit.
+    Final gate before an order touches Alpaca.
+    Buys/adds are blocked by entry filters and the 14% cap.
+    Trims/exits are allowed once request shape is valid.
     """
-    if side == "sell":
-        return True, "sell approved"
+    if shares <= 0:
+        return False, "Share quantity must be positive"
+    if price <= 0:
+        return False, "Price unavailable"
 
-    # Live entry quality check — re-run at order time, not just at premarket scoring
+    side = "add" if side == "buy" and get_position_by_ticker(ticker) else side
+
+    if side in ("sell", "trim", "exit"):
+        return True, "exit/trim approved"
+
+    if side not in ("buy", "add"):
+        return False, f"Unsupported order side: {side!r}"
+
     ok, reason = _live_entry_check(ticker)
     if not ok:
         return False, reason
 
     portfolio = get_portfolio_value()
-    total_value = portfolio["total_value"]
-
+    total_value = float(portfolio.get("total_value", 0) or 0)
     if total_value <= 0:
         return False, "Portfolio value unavailable"
 
-    # Max positions — the only capacity guard; no weight cap, no loss cap
-    counts = get_open_positions_count()
-    if bucket == "core" and counts["core"] >= MAX_CORE_POSITIONS:
-        return False, f"Core position limit reached ({MAX_CORE_POSITIONS})"
-    if bucket == "tactical" and counts["tactical"] >= MAX_TACTICAL_POSITIONS:
-        return False, f"Tactical position limit reached ({MAX_TACTICAL_POSITIONS})"
+    new_position_value = _position_value_after_order(ticker, shares, price, side)
+    max_allowed = total_value * MAX_POSITION_PCT
+    if new_position_value > max_allowed:
+        max_total_shares = int(max_allowed / price)
+        return False, (
+            f"Position would be ${new_position_value:,.0f}, above 14% cap "
+            f"(${max_allowed:,.0f}). Max total shares: {max_total_shares}."
+        )
 
     return True, "approved"
 
 
-def is_daily_loss_cap_hit() -> bool:
-    return False  # No daily loss cap — Analyst manages drawdowns by thesis
-
-
-def max_shares_for_position(price: float, position_weight_pct: float = None) -> int:
-    """Shares for a position sized by analyst-assigned weight. No hard cap."""
+def max_shares_for_position(price: float, position_weight_pct: float = None, ticker: str = None) -> int:
+    """Maximum additional shares while respecting analyst target and the 14% hard cap."""
     portfolio = get_portfolio_value()
-    total_value = portfolio["total_value"]
+    total_value = float(portfolio.get("total_value", 0) or 0)
     if price <= 0 or total_value <= 0:
         return 0
-    target_pct = (position_weight_pct or 8) / 100
-    return int((total_value * target_pct) / price)
 
-
-def get_tactical_positions_to_close() -> list[str]:
-    """
-    Returns tickers of tactical positions to close: held for 3+ trading days.
-    Price drops alone are never a reason to close — only a broken thesis is.
-    """
-    from db.queries import get_open_positions
-
-    positions = get_open_positions(bucket="tactical")
-    to_close = []
-
-    for p in positions:
-        if p["days_held"] >= TACTICAL_MAX_DAYS:
-            to_close.append((p["ticker"], f"max hold ({TACTICAL_MAX_DAYS} days) reached"))
-
-    return to_close
+    target_pct = min((position_weight_pct or 6) / 100, MAX_POSITION_PCT)
+    max_value = total_value * target_pct
+    existing_value = 0.0
+    if ticker:
+        existing = get_position_by_ticker(ticker)
+        if existing:
+            existing_value = float(existing.get("shares", 0) or 0) * price
+    return max(int((max_value - existing_value) / price), 0)

@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS portfolio (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date DATE NOT NULL UNIQUE,
     cash REAL NOT NULL,
     equity REAL NOT NULL,
     total_value REAL NOT NULL,
@@ -10,7 +11,7 @@ CREATE TABLE IF NOT EXISTS portfolio (
 CREATE TABLE IF NOT EXISTS positions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ticker TEXT NOT NULL,
-    bucket TEXT NOT NULL CHECK(bucket IN ('core', 'tactical')),
+    bucket TEXT NOT NULL DEFAULT 'core' CHECK(bucket IN ('core')),
     shares REAL NOT NULL,
     entry_price REAL NOT NULL,
     current_price REAL,
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS watchlist (
     quality_score REAL NOT NULL DEFAULT 0,
     momentum_score REAL NOT NULL DEFAULT 0,
     combined_score REAL NOT NULL DEFAULT 0,
-    bucket TEXT NOT NULL CHECK(bucket IN ('core', 'tactical')),
+    bucket TEXT NOT NULL DEFAULT 'core' CHECK(bucket IN ('core')),
+    position_weight_pct REAL DEFAULT 8,
     thesis TEXT,
     key_risks TEXT,
     sharia_status TEXT DEFAULT 'compliant',

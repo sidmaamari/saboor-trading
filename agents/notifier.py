@@ -16,9 +16,7 @@ def _send(text: str) -> None:
     try:
         # FIX [HIGH H-8]: Capture the response and check the HTTP status.
         # REASON: Previously a 401/429/5xx from Telegram would silently
-        #         drop the alert — including the daily loss cap alert,
-        #         which the trader relies on to know that trading has halted.
-        #         No log line, no exception, no signal.
+        #         drop important portfolio alerts with no visible signal.
         # SOLUTION: Capture the response, log a warning on non-200 with the
         #         response body so misconfiguration (bad token, blocked bot,
         #         rate limiting) is immediately visible in the phase logs.
@@ -54,10 +52,11 @@ def send_eod_report(
     portfolio_value: float,
     daily_return: float,
     spy_return: float,
-    core_count: int,
-    tactical_closed: int,
+    position_count: int,
     buys: int,
-    sells: int,
+    adds: int,
+    trims: int,
+    exits: int,
     weekly_alpha: float,
     date_str: str,
 ) -> None:
@@ -71,8 +70,8 @@ def send_eod_report(
         f"Portfolio: <b>${portfolio_value:,.0f}</b>\n"
         f"Today: {d_arrow} {abs(daily_return):.2f}%  |  SPY: {s_arrow} {abs(spy_return):.2f}%\n"
         f"Alpha: <b>{a_sign}{alpha:.2f}%</b>\n\n"
-        f"Positions: {core_count} Core open  |  {tactical_closed} Tactical closed\n"
-        f"Trades: {buys} buy  |  {sells} sell\n\n"
+        f"Positions: {position_count} open\n"
+        f"Actions: {buys} buy  |  {adds} add  |  {trims} trim  |  {exits} exit\n\n"
         f"Weekly vs SPY: <b>{'+' if weekly_alpha >= 0 else ''}{weekly_alpha:.2f}%</b>"
     )
     _send(text)
@@ -98,24 +97,26 @@ def send_premarket_report(watchlist: list[dict], excluded_count: int) -> None:
 
     lines = []
     for s in watchlist:
-        bucket_icon = "🔵" if s.get("bucket") == "core" else "🟡"
-        score = s.get("combined_score", 0)
-        ticker = _safe(s.get("ticker", ""))
-        thesis = _safe((s.get("thesis") or "")[:80])
-        lines.append(f"{bucket_icon} <b>{ticker}</b> ({score:.0f}/100) — {thesis}")
+        ticker   = _safe(s.get("ticker", ""))
+        quality  = s.get("quality_score", 0) or 0
+        timing   = s.get("entry_timing_score") or s.get("momentum_score", 0) or 0
+        combined = s.get("combined_score", 0) or 0
+        weight   = s.get("position_weight_pct", 0) or 0
+        sharia   = _safe(s.get("sharia_status", "compliant"))
+        thesis   = _safe((s.get("thesis") or "")[:100])
+        risks    = _safe((s.get("key_risks") or "")[:80])
+
+        sharia_tag = "" if sharia == "compliant" else f" ⚠️ {sharia}"
+
+        lines.append(
+            f"• <b>{ticker}</b>{sharia_tag}  {weight:.0f}% target\n"
+            f"  Q:{quality:.0f}  T:{timing:.0f}  Combined:{combined:.0f}/100\n"
+            f"  {thesis}\n"
+            f"  <i>Risk: {risks}</i>"
+        )
 
     _send(
-        f"<b>Saboor Pre-Market Watchlist</b>\n\n"
+        f"<b>Saboor Pre-Market — {len(watchlist)} candidates</b>\n\n"
         + "\n\n".join(lines)
-        + f"\n\n<i>{excluded_count} overbought stocks excluded today</i>"
-    )
-
-
-def send_daily_loss_cap_alert(daily_pl: float, portfolio_value: float) -> None:
-    pct = abs(daily_pl / portfolio_value * 100) if portfolio_value else 0
-    _send(
-        f"<b>🛑 Saboor: Daily Loss Cap Hit</b>\n\n"
-        f"Loss: <b>${abs(daily_pl):,.0f} ({pct:.1f}%)</b>\n"
-        f"All new trading halted for today.\n"
-        f"Existing Core positions are held."
+        + f"\n\n<i>{excluded_count} excluded by hard filters or below threshold</i>"
     )

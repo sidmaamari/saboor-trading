@@ -21,11 +21,13 @@ CREATE TABLE IF NOT EXISTS portfolio (
 CREATE TABLE IF NOT EXISTS positions (
     id BIGSERIAL PRIMARY KEY,
     ticker TEXT NOT NULL,
-    bucket TEXT NOT NULL CHECK(bucket IN ('core', 'tactical')),
+    -- Legacy compatibility column. New strategy has one portfolio; code writes 'core'.
+    bucket TEXT NOT NULL DEFAULT 'core' CHECK(bucket IN ('core')),
     shares REAL NOT NULL,
     entry_price REAL NOT NULL,
     current_price REAL,
     entry_date DATE NOT NULL,
+    -- Legacy compatibility column; no day-counter exit rule exists now.
     days_held INTEGER DEFAULT 0,
     thesis TEXT,
     quality_score REAL,
@@ -47,7 +49,8 @@ CREATE TABLE IF NOT EXISTS watchlist (
     quality_score REAL NOT NULL DEFAULT 0,
     momentum_score REAL NOT NULL DEFAULT 0,
     combined_score REAL NOT NULL DEFAULT 0,
-    bucket TEXT NOT NULL CHECK(bucket IN ('core', 'tactical')),
+    -- Legacy compatibility column. New strategy has one portfolio; code writes 'core'.
+    bucket TEXT NOT NULL DEFAULT 'core' CHECK(bucket IN ('core')),
     -- FIX [HIGH H-14]: position_weight_pct surfaces the analyst's per-stock
     -- conviction-weighted allocation. Risk Guardian uses this to size the order.
     position_weight_pct REAL DEFAULT 8,

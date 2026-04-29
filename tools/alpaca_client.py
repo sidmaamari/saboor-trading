@@ -36,14 +36,7 @@ def get_portfolio() -> dict:
     resp.raise_for_status()
     acct = resp.json()
 
-    # FIX [CRITICAL C-5]: Use equity delta for daily P&L instead of unrealized_pl.
-    # REASON: `unrealized_pl` only reflects mark-to-market on currently open
-    #         positions. Realized losses from closing positions intraday were
-    #         being silently dropped — an obvious blind spot for the daily
-    #         loss cap which is supposed to halt all trading at -2%.
-    # SOLUTION: equity - last_equity is the true intraday P&L number Alpaca
-    #         exposes for exactly this purpose; it captures both realized
-    #         and unrealized changes since the prior session close.
+    # Equity delta captures both realized and unrealized intraday movement.
     equity = float(acct.get("equity", 0) or 0)
     last_equity = float(acct.get("last_equity", 0) or 0)
     daily_pl = equity - last_equity
