@@ -30,18 +30,29 @@ async function fetchAlpacaPositions(totalValue: number) {
 }
 
 export async function GET() {
-  const [benchmarkResp, portfolioResp] = await Promise.all([
+  const [benchmarkResp, portfolioResp, positionsResp] = await Promise.all([
     supabase.from("benchmark").select("*").order("date", { ascending: true }),
     supabase.from("portfolio").select("*").order("last_updated", { ascending: false }).limit(1),
+    supabase.from("positions").select("ticker,thesis,sell_trigger,catalyst,bear_return_pct,base_return_pct,bull_return_pct,combined_score").eq("status", "open"),
   ]);
 
   const portfolio = portfolioResp.data?.[0] ?? null;
   const totalValue = portfolio?.total_value ?? 100_000;
   const livePositions = await fetchAlpacaPositions(totalValue);
 
+  const thesisByTicker: Record<string, any> = {};
+  for (const row of positionsResp.data ?? []) {
+    thesisByTicker[row.ticker] = row;
+  }
+
+  const enrichedPositions = livePositions.map((pos) => ({
+    ...pos,
+    ...(thesisByTicker[pos.ticker] ?? {}),
+  }));
+
   return NextResponse.json({
     benchmark: benchmarkResp.data ?? [],
     portfolio,
-    livePositions,
+    livePositions: enrichedPositions,
   });
 }

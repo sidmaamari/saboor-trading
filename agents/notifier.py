@@ -135,23 +135,58 @@ def send_trade_report(actions: list[dict], date_str: str) -> None:
     if not executable:
         return
 
-    lines = []
+    messages = []
     for item in executable:
         action = str(item.get("action", "")).upper()
         ticker = _safe(item.get("ticker", ""))
         shares = item.get("shares", 0)
-        price = item.get("price", 0) or 0
-        side_label = "SELL" if action in {"TRIM", "EXIT"} else "BUY"
-        reason = _safe(item.get("reason") or item.get("thesis") or "No reason provided.")
+        price = float(item.get("price", 0) or 0)
+        weight = item.get("position_weight_pct", 0) or 0
 
-        lines.append(
-            f"<b>{side_label} {ticker}</b> — {action}\n"
-            f"Shares: <b>{shares:g}</b> @ ${price:,.2f}\n"
-            f"Reason: {reason}"
-        )
+        if action in ("BUY", "ADD"):
+            label = "NEW" if action == "BUY" else "ADDED TO"
+            thesis = _safe(item.get("thesis") or "")
+            bear_case = _safe(item.get("bear_case") or "")
+            base_case = _safe(item.get("base_case") or "")
+            bull_case = _safe(item.get("bull_case") or "")
+            bear_r = item.get("bear_return_pct")
+            base_r = item.get("base_return_pct")
+            bull_r = item.get("bull_return_pct")
+            catalyst = _safe(item.get("catalyst") or "")
+            key_risks = _safe(item.get("key_risks") or "")
+            sell_trigger = _safe(item.get("sell_trigger") or "")
 
-    _send(
-        f"<b>Saboor Trade Decision — {_safe(date_str)}</b>\n\n"
-        + "\n\n".join(lines)
-    )
+            msg = (
+                f"<b>{label} {ticker} — {weight:.0f}% POSITION</b>\n"
+                f"{shares:g} shares @ ${price:,.2f}\n"
+                f"\n<b>Why Saboor bought:</b>\n{thesis}"
+            )
+
+            if bear_r is not None and base_r is not None and bull_r is not None:
+                msg += (
+                    f"\n\n<b>Expected returns (3-5 yr annualised):</b>\n"
+                    f"Bear  {bear_r:+.0f}%  {bear_case}\n"
+                    f"Base  {base_r:+.0f}%  {base_case}\n"
+                    f"Bull  {bull_r:+.0f}%  {bull_case}"
+                )
+
+            if catalyst:
+                msg += f"\n\n<b>Why now:</b>\n{catalyst}"
+            if key_risks:
+                msg += f"\n\n<b>Key risk:</b>\n{key_risks}"
+            if sell_trigger:
+                msg += f"\n\n<b>We would sell or reduce if:</b>\n{sell_trigger}"
+
+        else:
+            reason = _safe(item.get("reason") or item.get("thesis") or "")
+            msg = (
+                f"<b>{action} {ticker}</b>\n"
+                f"{shares:g} shares @ ${price:,.2f}\n"
+                f"\n<b>Reason:</b>\n{reason}"
+            )
+
+        messages.append(msg)
+
+    header = f"<b>Saboor — {_safe(date_str)}</b>  {len(executable)} action{'s' if len(executable) != 1 else ''}\n\n"
+    _send(header + "\n\n─────────────────\n\n".join(messages))
 

@@ -220,6 +220,11 @@ def execute_trades(
                     quality_score=wl_item.get("quality_score"),
                     momentum_score=wl_item.get("momentum_score"),
                     combined_score=wl_item.get("combined_score"),
+                    sell_trigger=wl_item.get("sell_trigger"),
+                    catalyst=wl_item.get("catalyst"),
+                    bear_return_pct=wl_item.get("bear_return_pct"),
+                    base_return_pct=wl_item.get("base_return_pct") or wl_item.get("forward_return_3_5yr_pct"),
+                    bull_return_pct=wl_item.get("bull_return_pct"),
                 )
                 mark_watchlist_acted(ticker)
                 bought_this_session.add(ticker)
@@ -230,7 +235,17 @@ def execute_trades(
                     "ticker": ticker,
                     "shares": shares,
                     "price": price,
+                    "position_weight_pct": wl_item.get("position_weight_pct", 0),
                     "thesis": thesis,
+                    "bear_case": wl_item.get("bear_case", ""),
+                    "base_case": wl_item.get("base_case", ""),
+                    "bull_case": wl_item.get("bull_case", ""),
+                    "bear_return_pct": wl_item.get("bear_return_pct"),
+                    "base_return_pct": wl_item.get("base_return_pct") or wl_item.get("forward_return_3_5yr_pct"),
+                    "bull_return_pct": wl_item.get("bull_return_pct"),
+                    "catalyst": wl_item.get("catalyst", ""),
+                    "key_risks": wl_item.get("key_risks", ""),
+                    "sell_trigger": wl_item.get("sell_trigger", ""),
                     "order_id": order.get("id"),
                 })
                 print(f"  {actual_action.upper()} {shares} {ticker} @ ${price:.2f}")

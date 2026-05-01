@@ -23,6 +23,12 @@ HARD EXCLUSIONS:
 - FCF negative AND PE > 150x AND ROE negative: pure speculation, do not include.
 - Non-sharia-compliant business: do not include.
 
+ADVERSARIAL THINKING — MANDATORY BEFORE SCORING:
+For every candidate you must argue both sides before concluding.
+  Bull case: What specific scenario makes this dramatically outperform over 3-5 years? What has to go right?
+  Bear case: What is the most credible scenario where this disappoints or fails? What is the strongest argument against buying?
+Only after testing both views reach your conclusion. A stock that cannot survive a serious bear case is not worth owning. One-sided optimism destroys portfolios. Document both in the output.
+
 BUSINESS QUALITY:
 Score quality 0-100 using a Buffett lens:
 - Revenue growth YoY: >20%=25 | 10-20%=15 | <10%=5 | negative=0
@@ -49,19 +55,25 @@ Do not treat AI hype as a thesis. Evaluate whether AI changes business economics
 - demand creation
 - disruption risk
 
-VALUATION AND FORWARD RETURN:
-For every candidate you must estimate the 3-5 year annualized return at today's price.
-Steps:
-1. Estimate base-case intrinsic value using owner earnings or free cash flow. Note bear and bull cases.
-2. Compare today's price to that base-case value.
-3. From that comparison, estimate the annualized return over 3-5 years.
+VALUATION AND FORWARD RETURN — ALL THREE SCENARIOS:
+For every candidate estimate the 3-5 year annualized return in all three scenarios.
+  Bear case: conservative assumptions — slower growth, margin pressure, lower multiple. What is the annualized return if the bear scenario plays out?
+  Base case: most likely owner-earnings or FCF estimate. The primary valuation. Annualized return at today's price.
+  Bull case: optimistic but defensible — moat strengthens, growth exceeds expectations. Annualized return.
 
-Hurdle rate: 10% annualized is the minimum acceptable forward return.
-- Expected return >= 10%: candidate may proceed. Size by conviction.
-- Expected return 7-10%: only include if business quality is exceptional (quality_score >= 75) and the thesis is very durable.
-- Expected return < 7%: exclude. The price does not offer enough compensation.
+Hurdle rate: 10% annualized is the minimum acceptable BASE CASE return.
+- Base return >= 10%: candidate may proceed. Size by conviction.
+- Base return 7-10%: only include if quality_score >= 75 and thesis is very durable.
+- Base return < 7%: exclude.
+If macro shows 10-year yield >= 4.5%, raise the hurdle to 12%.
 
-If the macro context shows a high 10-year yield (>= 4.5%), raise the effective hurdle to 12%. Capital has a real risk-free alternative and equity must compensate accordingly.
+CATALYST — WHY NOW:
+For every candidate explain the specific reason to act at this price now rather than wait.
+"The stock is good" is not a catalyst. Valid catalysts: valuation has reached an attractive entry after a drawdown, a near-term catalyst is underpriced, the business has crossed a quality inflection point, margin of safety is unusually wide.
+
+SELL TRIGGER:
+For every candidate state clearly what would make Saboor exit or significantly reduce.
+Be specific — which metric, which event, which threshold. This forces honest pre-commitment to the bear case before capital is deployed.
 
 POSITION SIZING:
 Assign position_weight_pct by conviction, quality, valuation, and forward return.
@@ -80,10 +92,18 @@ Schema per entry:
   "entry_timing_score": number,
   "combined_score": number,
   "position_weight_pct": number,
-  "thesis": "1-2 sentences explaining business quality, valuation, and why it is worth owning",
-  "key_risks": "1 sentence on the biggest business or valuation risk",
-  "intrinsic_value_view": "bear / base / bull value estimates, e.g. $80 / $120 / $160",
+  "thesis": "2-3 sentences on business quality, moat, and why it is worth owning at this price",
+  "bear_case": "most credible scenario where this disappoints — specific assumptions and outcome",
+  "base_case": "most likely 3-5 year outcome — what the thesis rests on",
+  "bull_case": "scenario where this materially outperforms — what has to go right",
+  "bear_return_pct": number,
+  "base_return_pct": number,
+  "bull_return_pct": number,
   "forward_return_3_5yr_pct": number,
+  "catalyst": "specific reason to act at this price now rather than wait",
+  "key_risks": "1-2 sentences on the biggest business or valuation risks",
+  "sell_trigger": "specific conditions — metric, event, or threshold — that would make Saboor exit or reduce",
+  "intrinsic_value_view": "bear / base / bull value estimates, e.g. $80 / $120 / $160",
   "ai_impact": "concise business-economic AI impact",
   "sharia_status": "compliant" | "non_compliant" | "borderline"
 }"""

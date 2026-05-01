@@ -14,6 +14,12 @@ interface LivePosition {
   unrealized_pl: number;
   unrealized_plpc: number;
   allocation_pct: number;
+  thesis?: string;
+  sell_trigger?: string;
+  catalyst?: string;
+  bear_return_pct?: number;
+  base_return_pct?: number;
+  bull_return_pct?: number;
 }
 
 interface BenchmarkRow {
@@ -252,6 +258,56 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
           </div>
         )}
       </div>
+
+      {/* Holdings — Investment Thesis */}
+      {hasPositions && livePositions.some((p) => p.thesis) && (
+        <div className="bg-[#111] border border-[#222] rounded-xl p-6 mt-6">
+          <h2 className="text-sm font-medium text-gray-400 mb-6">Investment Theses</h2>
+          <div className="flex flex-col gap-6">
+            {livePositions.filter((p) => p.thesis).map((pos, i) => {
+              const color = POSITION_COLORS[i % POSITION_COLORS.length];
+              const hasTranche = pos.bear_return_pct != null && pos.base_return_pct != null && pos.bull_return_pct != null;
+              return (
+                <div key={pos.ticker} className="border-b border-[#1a1a1a] last:border-0 pb-6 last:pb-0">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                    <span className="text-sm font-semibold">{pos.ticker}</span>
+                    <span className="text-xs text-gray-600 ml-1">{pos.allocation_pct.toFixed(1)}% of portfolio</span>
+                  </div>
+
+                  {pos.thesis && (
+                    <p className="text-sm text-gray-300 leading-relaxed mb-3">{pos.thesis}</p>
+                  )}
+
+                  {hasTranche && (
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg px-3 py-2">
+                        <p className="text-xs text-gray-600 mb-0.5">Bear</p>
+                        <p className="text-sm font-medium text-red-400">{pos.bear_return_pct! >= 0 ? "+" : ""}{pos.bear_return_pct!.toFixed(0)}% / yr</p>
+                      </div>
+                      <div className="bg-[#0d0d0d] border border-[#222] rounded-lg px-3 py-2">
+                        <p className="text-xs text-gray-600 mb-0.5">Base</p>
+                        <p className="text-sm font-medium text-gray-200">{pos.base_return_pct! >= 0 ? "+" : ""}{pos.base_return_pct!.toFixed(0)}% / yr</p>
+                      </div>
+                      <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg px-3 py-2">
+                        <p className="text-xs text-gray-600 mb-0.5">Bull</p>
+                        <p className="text-sm font-medium text-green-400">{pos.bull_return_pct! >= 0 ? "+" : ""}{pos.bull_return_pct!.toFixed(0)}% / yr</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {pos.sell_trigger && (
+                    <div className="flex gap-2 mt-2">
+                      <span className="text-xs text-gray-600 flex-shrink-0 mt-0.5">Exit if:</span>
+                      <span className="text-xs text-gray-500 leading-relaxed">{pos.sell_trigger}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

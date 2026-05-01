@@ -109,6 +109,11 @@ def save_position(
     quality_score: float = None,
     momentum_score: float = None,
     combined_score: float = None,
+    sell_trigger: str = None,
+    catalyst: str = None,
+    bear_return_pct: float = None,
+    base_return_pct: float = None,
+    bull_return_pct: float = None,
 ):
     existing = get_position_by_ticker(ticker)
     if existing:
@@ -127,6 +132,11 @@ def save_position(
             "quality_score": quality_score if quality_score is not None else existing.get("quality_score"),
             "momentum_score": momentum_score if momentum_score is not None else existing.get("momentum_score"),
             "combined_score": combined_score if combined_score is not None else existing.get("combined_score"),
+            "sell_trigger": sell_trigger or existing.get("sell_trigger"),
+            "catalyst": catalyst or existing.get("catalyst"),
+            "bear_return_pct": bear_return_pct if bear_return_pct is not None else existing.get("bear_return_pct"),
+            "base_return_pct": base_return_pct if base_return_pct is not None else existing.get("base_return_pct"),
+            "bull_return_pct": bull_return_pct if bull_return_pct is not None else existing.get("bull_return_pct"),
             "bucket": "core",
         }).eq("id", existing["id"]).execute()
         return
@@ -138,6 +148,11 @@ def save_position(
         "entry_price": entry_price,
         "entry_date": entry_date.isoformat(),
         "thesis": thesis,
+        "sell_trigger": sell_trigger,
+        "catalyst": catalyst,
+        "bear_return_pct": bear_return_pct,
+        "base_return_pct": base_return_pct,
+        "bull_return_pct": bull_return_pct,
         "quality_score": quality_score,
         "momentum_score": momentum_score,
         "combined_score": combined_score,
@@ -259,7 +274,16 @@ def save_watchlist(trading_date: date, items: list[dict]):
             "bucket": "core",
             "position_weight_pct": item.get("position_weight_pct", 8),
             "thesis": item.get("thesis", ""),
+            "bear_case": item.get("bear_case", ""),
+            "base_case": item.get("base_case", ""),
+            "bull_case": item.get("bull_case", ""),
+            "bear_return_pct": item.get("bear_return_pct"),
+            "base_return_pct": item.get("base_return_pct") or item.get("forward_return_3_5yr_pct"),
+            "bull_return_pct": item.get("bull_return_pct"),
+            "forward_return_3_5yr_pct": item.get("forward_return_3_5yr_pct"),
+            "catalyst": item.get("catalyst", ""),
             "key_risks": item.get("key_risks", ""),
+            "sell_trigger": item.get("sell_trigger", ""),
             "sharia_status": item.get("sharia_status", "compliant"),
             "acted_on": acted_by_ticker.get(item["ticker"], False),
         }
