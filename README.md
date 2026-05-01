@@ -34,6 +34,9 @@ These rules are enforced in code and cannot be overridden by the Analyst:
 - Price > 150% above MA200 -> blocked for new buys/adds
 - FCF negative + PE > 150x + ROE negative -> blocked as pure speculation
 - Single position size > 14% of portfolio -> blocked
+- Sell order with no long position in Alpaca -> blocked (prevents accidental shorts)
+
+Saboor is long-only. It never opens short positions, uses margin, uses leverage, trades options, or buys inverse ETFs. If the Analyst dislikes a company, the only valid response is Hold Cash or Avoid — never Short.
 
 ### Portfolio Philosophy
 
@@ -56,6 +59,8 @@ The Analyst assigns position weights based on conviction, business quality, valu
 
 Maximum position size: **14% of portfolio value**.
 
+When Saboor decides to buy a stock, it should first decide the full intended exposure and then place one consolidated order for that approved size, subject to cash, liquidity, broker limits, and the 14% cap. It should not split one buy decision into multiple same-ticker orders minutes apart.
+
 The system may average up or average down only after a fresh review confirms:
 
 - the thesis is intact or stronger
@@ -63,6 +68,29 @@ The system may average up or average down only after a fresh review confirms:
 - the valuation is still reasonable
 - the forward expected return remains attractive
 - the resulting position stays within the 14% cap
+- at least 24 hours have passed since the previous filled Buy/Add for that ticker, or the new price is at least 2% below the previous filled Buy/Add price, or a material new fact justifies immediate additional capital
+
+Same-day duplicate buys at nearly the same price are not allowed. If Saboor wants a 6% position, it should normally buy the 6% position once rather than buy 3% and then another 3% a few minutes later with no valuation benefit.
+
+### Claude Trader Prompt Guardrail
+
+Use this instruction in Claude Trader/Analyst prompts:
+
+```text
+Before recommending any Buy or Add, decide the full desired position size first.
+If the stock should be owned, recommend one consolidated order for the full
+approved size, subject to cash, liquidity, broker limits, and the 14% max
+position cap.
+
+Do not create duplicate same-ticker buys minutes apart. If there was already a
+filled Buy/Add for this ticker, block another Buy/Add unless at least 24 hours
+have passed, or the new price is at least 2% below the previous filled Buy/Add
+price, or a material new fact has changed the thesis and you explain it clearly.
+
+If staging into a position is intentional, document the tranche plan, the
+next-tranche trigger, and why staging is better than buying the full intended
+exposure now. A second same-day trade at nearly the same price is not allowed.
+```
 
 ### Valuation and Forward Return
 
@@ -195,7 +223,7 @@ saboor-trading/
 
 ## Dashboard
 
-Live performance vs SPY is tracked on the dashboard. It shows cumulative return, daily alpha, portfolio value, and open positions.
+Live performance vs SPY is tracked on the dashboard. It shows cumulative return, daily alpha, portfolio value, a portfolio allocation pie chart, and open positions with entry price, current price, market value, and unrealized P&L.
 
 ---
 

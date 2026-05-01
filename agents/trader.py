@@ -27,6 +27,7 @@ Valid actions:
 - exit: close a position when thesis breaks, sharia status changes, intrinsic value falls, or forward expected return is unattractive
 
 RULES:
+- Saboor is LONG-ONLY. Never recommend short positions, margin, leverage, options, or inverse ETFs. If you dislike a company, the only valid actions are Hold Cash or Avoid — never Short.
 - Never buy or add because of momentum alone.
 - Never sell, trim, or exit only because price dropped.
 - Cash is valid. Do not force deployment.

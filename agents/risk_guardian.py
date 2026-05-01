@@ -1,4 +1,4 @@
-from tools.alpaca_client import get_bars
+from tools.alpaca_client import get_bars, get_alpaca_position_qty
 from tools.technical import calculate_signals
 from db.queries import get_portfolio_value, get_position_by_ticker
 
@@ -63,6 +63,9 @@ def validate_order(
     side = "add" if side == "buy" and get_position_by_ticker(ticker) else side
 
     if side in ("sell", "trim", "exit"):
+        alpaca_qty = get_alpaca_position_qty(ticker)
+        if alpaca_qty <= 0:
+            return False, f"no long position in Alpaca for {ticker}; sell blocked — Saboor is long-only"
         return True, "exit/trim approved"
 
     if side not in ("buy", "add"):

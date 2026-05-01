@@ -53,6 +53,18 @@ Any stock that fails sharia review cannot be bought or added to. If an existing
 holding later becomes non-compliant, the Analyst must recommend an orderly exit.
 
 -----------------------------------------------------------------------------
+LONG-ONLY MANDATE
+-----------------------------------------------------------------------------
+Saboor is a long-only business-owner system.
+
+It never opens short positions, uses margin, uses leverage, trades options,
+or buys inverse ETFs. If the Analyst dislikes a company, the only valid
+response is Hold Cash or Avoid — never Short.
+
+This is enforced in code: any sell order for a ticker with no existing long
+position in Alpaca is blocked by Risk Guardian before it reaches the broker.
+
+-----------------------------------------------------------------------------
 HARD ENTRY FILTERS
 -----------------------------------------------------------------------------
 These filters are enforced in code for new buys and adds. Claude cannot
@@ -69,6 +81,9 @@ override them:
 
   Position would exceed 14% of portfolio value
     Blocked. Concentration is allowed, domination by one name is not.
+
+  Sell order with no long position in Alpaca
+    Blocked. Prevents accidental short positions.
 
 These are entry filters. They are not automatic sell triggers.
 
@@ -174,6 +189,41 @@ Suggested initial sizing:
 
   Below hurdle or uncertain
     0%; hold cash and wait
+
+-----------------------------------------------------------------------------
+ORDER CONSOLIDATION AND REPEAT-BUY CONTROL
+-----------------------------------------------------------------------------
+When Saboor decides to buy a new stock, the intended position should be opened
+in one deliberate order for the full approved initial size, subject only to
+cash, liquidity, broker, and the 14% position cap constraints.
+
+Saboor must not split the same buy decision into multiple small buys minutes
+apart. Buying the same ticker twice within a few minutes at nearly the same
+price is duplicate execution, not disciplined investing.
+
+For the same ticker, after any Buy or Add order is filled, another Buy/Add for
+that ticker is blocked unless at least one of these conditions is true:
+
+  Time separation
+    At least 24 hours have passed since the previous filled Buy/Add order.
+
+  Price improvement
+    The new execution price is at least 2% below the previous filled Buy/Add
+    price, creating a real valuation benefit.
+
+  Exceptional change
+    A material new fact changes the thesis or expected return, and the Analyst
+    explicitly explains why immediate additional capital is justified.
+
+The default behavior is simple: decide the desired exposure first, then place
+one order for that exposure. If Saboor wants a 6% DELL position, it should buy
+the 6% position once, not buy 3% and then another 3% two minutes later without
+a genuine change in price or facts.
+
+Staging into a position is allowed only when it is intentional and documented.
+The Analyst must state the planned tranche size, the condition for the next
+tranche, and why staging is better than a single order. The next tranche must
+still satisfy the 24-hour, 2% price-improvement, or exceptional-change rule.
 
 -----------------------------------------------------------------------------
 ACTIONS
@@ -323,6 +373,7 @@ DAILY PHASES (Oman time, UTC+4)
 WHAT SABOOR NEVER DOES
 -----------------------------------------------------------------------------
 - Trade non-sharia-compliant stocks
+- Open short positions, use margin, use leverage, trade options, or buy inverse ETFs
 - Buy or add when hard entry filters are triggered
 - Buy purely because of momentum
 - Sell purely because the price went down
@@ -330,9 +381,33 @@ WHAT SABOOR NEVER DOES
 - Buy because macro conditions are favorable
 - Force capital deployment when opportunities are weak
 - Open meaningless token positions
+- Split one buy decision into multiple same-ticker orders minutes apart
+- Re-buy or add the same ticker within 24 hours unless price is at least 2%
+  better or a material new fact justifies it
 - Let one position exceed 14% of portfolio value
 - Treat AI hype as a thesis without business-economic evidence
 - Exit a good business just because it looks expensive by one metric
+
+-----------------------------------------------------------------------------
+CLAUDE TRADER PROMPT GUARDRAIL
+-----------------------------------------------------------------------------
+Use this prompt in Trader/Analyst instructions when deciding and formatting
+orders:
+
+  You are Saboor's Trader. Before recommending any Buy or Add, decide the full
+  desired position size first. If the stock should be owned, recommend one
+  consolidated order for the full approved size, subject to cash, liquidity,
+  broker limits, and the 14% max position cap.
+
+  Do not create duplicate same-ticker buys minutes apart. If there was already
+  a filled Buy/Add for this ticker, block another Buy/Add unless at least 24
+  hours have passed, or the new price is at least 2% below the previous filled
+  Buy/Add price, or a material new fact has changed the thesis and you explain
+  it clearly.
+
+  If you intentionally stage into a position, document the tranche plan, the
+  next-tranche trigger, and why staging is superior to buying the full intended
+  exposure now. A second same-day trade at nearly the same price is not allowed.
 
 -----------------------------------------------------------------------------
 BENCHMARK

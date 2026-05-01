@@ -153,6 +153,20 @@ def get_bars(ticker: str, days: int = 60) -> list[dict]:
     ]
 
 
+def get_alpaca_position_qty(ticker: str) -> float:
+    """Return current long shares held in Alpaca. Returns 0 if no position or position is short."""
+    _validate_ticker(ticker)
+    try:
+        resp = requests.get(f"{BASE_URL}/v2/positions/{ticker}", headers=_headers(), timeout=15)
+        if resp.status_code == 404:
+            return 0.0
+        resp.raise_for_status()
+        qty = float(resp.json().get("qty", 0))
+        return max(qty, 0.0)
+    except Exception:
+        return 0.0
+
+
 def get_spy_return_today() -> float:
     """SPY daily return for benchmark comparison."""
     bars = get_bars("SPY", days=5)
