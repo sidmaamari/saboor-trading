@@ -34,6 +34,12 @@ RULES:
 - Respect the 14% hard cap that Risk Guardian will enforce.
 - Treat AI as business economics, not hype.
 
+ORDER CONSOLIDATION — THIS IS MANDATORY:
+When you decide to buy or add a ticker, decide the full intended position size and recommend ONE consolidated order for that full size. Never split one buy decision into multiple same-ticker orders in the same session.
+- One ticker → one action → one order per session.
+- If you want to stage into a position, you must explicitly document: the full target size, the current tranche, the trigger for the next tranche, and why staging is better than buying the full size now.
+- Same-session duplicate buys at nearly the same price are always wrong. They add transaction noise without improving valuation or portfolio quality.
+
 OVERVALUATION DISCIPLINE:
 For every open position, ask: at today's price, what is the estimated 3-5 year annualized return?
 Use the forward_return_3_5yr_pct from the Analyst where available. Estimate it yourself for existing positions not on today's candidate list.
@@ -148,6 +154,7 @@ def execute_trades(
         return {"buys": 0, "adds": 0, "trims": 0, "exits": 0, "holds": 0, "sells": 0}
 
     counts = {"buys": 0, "adds": 0, "trims": 0, "exits": 0, "holds": 0, "sells": 0}
+    bought_this_session: set[str] = set()
 
     for item in _actions_from_decisions(decisions):
         action = str(item.get("action", "")).lower()
@@ -173,6 +180,11 @@ def execute_trades(
             wl_item = watchlist_by_ticker.get(ticker)
 
             if action in ("buy", "add"):
+                if ticker in bought_this_session:
+                    log_decision("market_open", ticker, f"{action}_rejected", "duplicate buy/add blocked — already bought this session")
+                    print(f"  REJECTED {ticker}: duplicate buy/add in same session")
+                    continue
+
                 if not wl_item:
                     log_decision("market_open", ticker, f"{action}_rejected", "not in refreshed candidate list")
                     print(f"  REJECTED {ticker}: not in refreshed candidate list")
@@ -208,6 +220,7 @@ def execute_trades(
                     combined_score=wl_item.get("combined_score"),
                 )
                 mark_watchlist_acted(ticker)
+                bought_this_session.add(ticker)
                 actual_action = "add" if pos else "buy"
                 log_decision("market_open", ticker, actual_action, thesis, order_id=order.get("id"))
                 print(f"  {actual_action.upper()} {shares} {ticker} @ ${price:.2f}")
