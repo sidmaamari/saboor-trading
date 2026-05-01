@@ -152,9 +152,10 @@ def execute_trades(
         decisions = complete(TRADER_SYSTEM, user_msg, as_json=True)
     except Exception as e:
         log_decision("market_open", None, "trader_error", str(e))
-        return {"buys": 0, "adds": 0, "trims": 0, "exits": 0, "holds": 0, "sells": 0}
+        return {"buys": 0, "adds": 0, "trims": 0, "exits": 0, "holds": 0, "sells": 0, "executed_actions": []}
 
     counts = {"buys": 0, "adds": 0, "trims": 0, "exits": 0, "holds": 0, "sells": 0}
+    executed_actions = []
     bought_this_session: set[str] = set()
 
     for item in _actions_from_decisions(decisions):
@@ -224,6 +225,14 @@ def execute_trades(
                 bought_this_session.add(ticker)
                 actual_action = "add" if pos else "buy"
                 log_decision("market_open", ticker, actual_action, thesis, order_id=order.get("id"))
+                executed_actions.append({
+                    "action": actual_action,
+                    "ticker": ticker,
+                    "shares": shares,
+                    "price": price,
+                    "thesis": thesis,
+                    "order_id": order.get("id"),
+                })
                 print(f"  {actual_action.upper()} {shares} {ticker} @ ${price:.2f}")
                 counts["adds" if pos else "buys"] += 1
                 continue
@@ -246,9 +255,18 @@ def execute_trades(
                     log_decision("market_open", ticker, "trim_rejected", reason)
                     continue
 
-                place_order(ticker, "sell", shares)
-                reduce_position(ticker, shares, price, item.get("reason", "valuation/concentration trim"))
-                log_decision("market_open", ticker, "trim", item.get("reason", "trim"))
+                order = place_order(ticker, "sell", shares)
+                reason = item.get("reason", "valuation/concentration trim")
+                reduce_position(ticker, shares, price, reason)
+                log_decision("market_open", ticker, "trim", reason)
+                executed_actions.append({
+                    "action": "trim",
+                    "ticker": ticker,
+                    "shares": shares,
+                    "price": price,
+                    "reason": reason,
+                    "order_id": order.get("id"),
+                })
                 print(f"  TRIMMED {shares} {ticker} @ ${price:.2f}")
                 counts["trims"] += 1
                 counts["sells"] += 1
@@ -261,9 +279,18 @@ def execute_trades(
                     log_decision("market_open", ticker, "exit_rejected", reason)
                     continue
 
-                place_order(ticker, "sell", shares)
-                close_position(ticker, price, item.get("reason", "strategy_exit"))
-                log_decision("market_open", ticker, "exit", item.get("reason", "strategy_exit"))
+                order = place_order(ticker, "sell", shares)
+                reason = item.get("reason", "strategy_exit")
+                close_position(ticker, price, reason)
+                log_decision("market_open", ticker, "exit", reason)
+                executed_actions.append({
+                    "action": "exit",
+                    "ticker": ticker,
+                    "shares": shares,
+                    "price": price,
+                    "reason": reason,
+                    "order_id": order.get("id"),
+                })
                 print(f"  EXITED {ticker} @ ${price:.2f}")
                 counts["exits"] += 1
                 counts["sells"] += 1
@@ -272,4 +299,5 @@ def execute_trades(
             log_decision("market_open", ticker, f"{action}_error", str(e))
             print(f"  {action.upper()} ERROR {ticker}: {e}")
 
+    counts["executed_actions"] = executed_actions
     return counts

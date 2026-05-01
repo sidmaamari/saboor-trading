@@ -3,6 +3,48 @@ import os
 import requests
 
 TELEGRAM_API = "https://api.telegram.org"
+TELEGRAM_MESSAGE_LIMIT = 4096
+TELEGRAM_SAFE_LIMIT = 3800
+
+
+def _split_message(text: str, limit: int = TELEGRAM_SAFE_LIMIT) -> list[str]:
+    """Split long Telegram messages on paragraph/word boundaries."""
+    if len(text) <= limit:
+        return [text]
+
+    chunks = []
+    current = ""
+
+    def flush_current():
+        nonlocal current
+        if current:
+            chunks.append(current.rstrip())
+            current = ""
+
+    for paragraph in text.split("\n\n"):
+        block = paragraph if not current else f"\n\n{paragraph}"
+        if len(current) + len(block) <= limit:
+            current += block
+            continue
+
+        flush_current()
+        if len(paragraph) <= limit:
+            current = paragraph
+            continue
+
+        line = ""
+        for word in paragraph.split(" "):
+            addition = word if not line else f" {word}"
+            if len(line) + len(addition) <= limit:
+                line += addition
+            else:
+                if line:
+                    chunks.append(line.rstrip())
+                line = word
+        current = line
+
+    flush_current()
+    return chunks or [text[:TELEGRAM_MESSAGE_LIMIT]]
 
 
 def _send(text: str) -> None:
@@ -10,27 +52,22 @@ def _send(text: str) -> None:
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
     if not token or not chat_id:
-        print(f"[Telegram not configured]\n{text}\n")
+        for chunk in _split_message(text):
+            print(f"[Telegram not configured]\n{chunk}\n")
         return
 
-    try:
-        # FIX [HIGH H-8]: Capture the response and check the HTTP status.
-        # REASON: Previously a 401/429/5xx from Telegram would silently
-        #         drop important portfolio alerts with no visible signal.
-        # SOLUTION: Capture the response, log a warning on non-200 with the
-        #         response body so misconfiguration (bad token, blocked bot,
-        #         rate limiting) is immediately visible in the phase logs.
-        resp = requests.post(
-            f"{TELEGRAM_API}/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            # Telegram surfaces useful detail in the response body — keep it bounded.
-            body_preview = (resp.text or "")[:200]
-            print(f"Telegram non-200 status={resp.status_code}: {body_preview}")
-    except requests.RequestException as e:
-        print(f"Telegram send failed: {e}")
+    for chunk in _split_message(text):
+        try:
+            resp = requests.post(
+                f"{TELEGRAM_API}/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": chunk, "parse_mode": "HTML"},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                body_preview = (resp.text or "")[:200]
+                print(f"Telegram non-200 status={resp.status_code}: {body_preview}")
+        except requests.RequestException as e:
+            print(f"Telegram send failed: {e}")
 
 
 def _safe(value) -> str:
@@ -86,37 +123,35 @@ def send_urgent(ticker: str, trigger: str, action: str) -> None:
 
 
 def send_premarket_report(watchlist: list[dict], excluded_count: int) -> None:
-    if not watchlist:
-        _send(
-            f"<b>Saboor Pre-Market</b>\n\n"
-            f"No stocks passed today's filters.\n"
-            f"{excluded_count} candidates excluded (overbought/extended).\n"
-            f"No trades will execute at open."
-        )
+    """Premarket candidates are internal only; Telegram reports confirmed trades."""
+    return
+
+
+def send_trade_report(actions: list[dict], date_str: str) -> None:
+    executable = [
+        item for item in actions
+        if str(item.get("action", "")).lower() in {"buy", "add", "trim", "exit"}
+    ]
+    if not executable:
         return
 
     lines = []
-    for s in watchlist:
-        ticker   = _safe(s.get("ticker", ""))
-        quality  = s.get("quality_score", 0) or 0
-        timing   = s.get("entry_timing_score") or s.get("momentum_score", 0) or 0
-        combined = s.get("combined_score", 0) or 0
-        weight   = s.get("position_weight_pct", 0) or 0
-        sharia   = _safe(s.get("sharia_status", "compliant"))
-        thesis   = _safe((s.get("thesis") or "")[:100])
-        risks    = _safe((s.get("key_risks") or "")[:80])
-
-        sharia_tag = "" if sharia == "compliant" else f" ⚠️ {sharia}"
+    for item in executable:
+        action = str(item.get("action", "")).upper()
+        ticker = _safe(item.get("ticker", ""))
+        shares = item.get("shares", 0)
+        price = item.get("price", 0) or 0
+        side_label = "SELL" if action in {"TRIM", "EXIT"} else "BUY"
+        reason = _safe(item.get("reason") or item.get("thesis") or "No reason provided.")
 
         lines.append(
-            f"• <b>{ticker}</b>{sharia_tag}  {weight:.0f}% target\n"
-            f"  Q:{quality:.0f}  T:{timing:.0f}  Combined:{combined:.0f}/100\n"
-            f"  {thesis}\n"
-            f"  <i>Risk: {risks}</i>"
+            f"<b>{side_label} {ticker}</b> — {action}\n"
+            f"Shares: <b>{shares:g}</b> @ ${price:,.2f}\n"
+            f"Reason: {reason}"
         )
 
     _send(
-        f"<b>Saboor Pre-Market — {len(watchlist)} candidates</b>\n\n"
+        f"<b>Saboor Trade Decision — {_safe(date_str)}</b>\n\n"
         + "\n\n".join(lines)
-        + f"\n\n<i>{excluded_count} excluded by hard filters or below threshold</i>"
     )
+

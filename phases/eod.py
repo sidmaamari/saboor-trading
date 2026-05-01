@@ -1,6 +1,6 @@
 """
 EOD phase — 3:30 PM ET
-Records benchmark performance and sends Telegram EOD report.
+Records benchmark performance and sends Telegram EOD report only on trade days.
 """
 from datetime import date
 from tools.alpaca_client import get_portfolio, get_spy_return_today
@@ -47,18 +47,21 @@ def run():
     exits = sum(1 for d in decisions if d["action"] == "exit")
     open_positions = get_open_positions()
 
-    send_eod_report(
-        portfolio_value=portfolio["total_value"],
-        daily_return=daily_return,
-        spy_return=spy_return * 100,
-        position_count=len(open_positions),
-        buys=buys,
-        adds=adds,
-        trims=trims,
-        exits=exits,
-        weekly_alpha=weekly_alpha,
-        date_str=today.strftime("%b %d, %Y"),
-    )
+    if buys + adds + trims + exits > 0:
+        send_eod_report(
+            portfolio_value=portfolio["total_value"],
+            daily_return=daily_return,
+            spy_return=spy_return * 100,
+            position_count=len(open_positions),
+            buys=buys,
+            adds=adds,
+            trims=trims,
+            exits=exits,
+            weekly_alpha=weekly_alpha,
+            date_str=today.strftime("%b %d, %Y"),
+        )
+    else:
+        print("Telegram quiet: no buy/sell decisions today.")
 
     print(
         f"\nEOD complete — Portfolio: ${portfolio['total_value']:,.0f} "

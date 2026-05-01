@@ -6,6 +6,7 @@ from datetime import date
 from tools.alpaca_client import get_portfolio
 from tools.macro_client import get_macro_snapshot
 from agents.trader import execute_trades
+from agents.notifier import send_trade_report
 from db.queries import get_todays_watchlist, get_open_positions, log_decision, sync_portfolio
 
 
@@ -49,6 +50,7 @@ def run():
 
     # Execute
     result = execute_trades(watchlist, open_positions, macro=macro)
+    send_trade_report(result.get("executed_actions", []), today.strftime("%b %d, %Y"))
 
     log_decision(
         "market_open", None, "phase_complete",

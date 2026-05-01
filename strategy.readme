@@ -365,9 +365,32 @@ Invalid reasons to sell:
 DAILY PHASES (Oman time, UTC+4)
 -----------------------------------------------------------------------------
   3:30 PM  PRE-MARKET    Sharia screen + yfinance research + candidate refresh
-  5:35 PM  MARKET OPEN   Buy/Add/Hold/Trim/Exit review through Risk Guardian
+                           Telegram silent; candidates are internal only.
+  5:35 PM  MARKET OPEN   Buy/Add/Hold/Trim/Exit review through Risk Guardian.
+                           Telegram reports only approved/executed trades.
   8:00 PM  MIDDAY        Portfolio monitoring and urgent thesis/compliance checks
- 11:30 PM  EOD           Benchmark record + Telegram report
+ 11:30 PM  EOD           Benchmark record. Telegram quiet unless there were
+                           buy/sell actions that day.
+
+-----------------------------------------------------------------------------
+TELEGRAM REPORTING
+-----------------------------------------------------------------------------
+Telegram is for confirmed action, not possible trades.
+
+Pre-market candidates, watchlists, and "possible trade" ideas must not be sent
+to Telegram. They are internal research inputs until the Trader decides and Risk
+Guardian approves an actual Buy, Add, Trim, or Exit.
+
+Once a trade is approved and executed, Telegram should report only the executed
+stock actions for that day. Stocks that are merely candidates, holds, avoids,
+or below threshold should not appear in the Telegram report.
+
+If there are no Buy/Add/Trim/Exit actions for the day, Telegram stays quiet.
+
+Every sent trade report must give a complete explanation for each stock action:
+action, ticker, shares, execution price, and the full reason. Reports must be
+split into multiple Telegram-safe messages when needed, not truncated in the
+middle of a sentence or word.
 
 -----------------------------------------------------------------------------
 WHAT SABOOR NEVER DOES
@@ -380,6 +403,8 @@ WHAT SABOOR NEVER DOES
 - Sell because macro conditions are scary
 - Buy because macro conditions are favorable
 - Force capital deployment when opportunities are weak
+- Send Telegram reports about possible trades or pre-market candidates
+- Truncate Telegram stock explanations mid-sentence or mid-word
 - Open meaningless token positions
 - Split one buy decision into multiple same-ticker orders minutes apart
 - Re-buy or add the same ticker within 24 hours unless price is at least 2%

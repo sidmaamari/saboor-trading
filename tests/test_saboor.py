@@ -28,8 +28,10 @@ sys.modules.setdefault("db.supabase_client", _supabase_client_mock)
 import tools.technical        # no heavy deps — pure Python
 import agents.analyst         # imports tools.claude_client (anthropic mocked)
 import agents.risk_guardian   # imports db.queries → db.supabase_client (mocked)
+import agents.notifier
 import db.queries
 import phases.eod
+import phases.premarket
 
 
 # ── 1. 14% position cap enforcement ──────────────────────────────────────────
@@ -61,17 +63,19 @@ class TestRiskGuardianCap(unittest.TestCase):
         approved, _ = validate_order("AAPL", "buy", 13, 100.0, "core")
         self.assertTrue(approved)
 
+    @patch("agents.risk_guardian.get_alpaca_position_qty", return_value=100)
     @patch("agents.risk_guardian.get_portfolio_value")
     @patch("agents.risk_guardian.get_position_by_ticker", return_value=None)
-    def test_exit_always_approved(self, mock_pos, mock_pv):
+    def test_exit_always_approved(self, mock_pos, mock_pv, mock_qty):
         from agents.risk_guardian import validate_order
         mock_pv.return_value = self._portfolio()
         approved, _ = validate_order("AAPL", "exit", 100, 100.0)
         self.assertTrue(approved)
 
+    @patch("agents.risk_guardian.get_alpaca_position_qty", return_value=100)
     @patch("agents.risk_guardian.get_portfolio_value")
     @patch("agents.risk_guardian.get_position_by_ticker", return_value=None)
-    def test_trim_always_approved(self, mock_pos, mock_pv):
+    def test_trim_always_approved(self, mock_pos, mock_pv, mock_qty):
         from agents.risk_guardian import validate_order
         mock_pv.return_value = self._portfolio()
         approved, _ = validate_order("AAPL", "trim", 5, 100.0)
@@ -407,7 +411,56 @@ class TestBenchmarkPreviousDate(unittest.TestCase):
         self.assertEqual(lt_call[0][1], "2026-04-28")
 
 
-# ── 9. Premarket save_watchlist preserves acted_on flag ──────────────────────
+# ── 9. Telegram only reports real trade decisions ────────────────────────────
+
+class TestTelegramTradeNotifications(unittest.TestCase):
+
+    def test_premarket_phase_does_not_send_candidate_report(self):
+        import inspect
+        source = inspect.getsource(phases.premarket)
+        self.assertNotIn("send_premarket_report(", source)
+
+    def test_trade_report_is_silent_without_executed_actions(self):
+        with patch("agents.notifier._send") as mock_send:
+            agents.notifier.send_trade_report([], "May 01, 2026")
+        mock_send.assert_not_called()
+
+    def test_trade_report_includes_full_reason_without_character_slice(self):
+        reason = (
+            "Dell thesis remains intact with improving AI server demand, "
+            "positive free cash flow, and a valuation that still clears the "
+            "hurdle rate after risk review. This final sentence must survive."
+        )
+        with patch("agents.notifier._send") as mock_send:
+            agents.notifier.send_trade_report([
+                {
+                    "action": "buy",
+                    "ticker": "DELL",
+                    "shares": 10,
+                    "price": 125.25,
+                    "reason": reason,
+                }
+            ], "May 01, 2026")
+
+        sent = mock_send.call_args[0][0]
+        self.assertIn("This final sentence must survive.", sent)
+        self.assertNotIn("Pre-Market", sent)
+
+    def test_long_telegram_messages_split_under_safe_limit(self):
+        text = "\n\n".join(f"Paragraph {i} " + ("x" * 300) for i in range(20))
+        chunks = agents.notifier._split_message(text, limit=1000)
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk) <= 1000 for chunk in chunks))
+        self.assertIn("Paragraph 19", chunks[-1])
+
+    def test_eod_is_quiet_when_no_trade_actions(self):
+        import inspect
+        source = inspect.getsource(phases.eod)
+        self.assertIn("if buys + adds + trims + exits > 0:", source)
+        self.assertIn("Telegram quiet: no buy/sell decisions today.", source)
+
+
+# ── 10. Premarket save_watchlist preserves acted_on flag ─────────────────────
 
 class TestSaveWatchlistPreservesActedOn(unittest.TestCase):
 
@@ -450,7 +503,7 @@ class TestSaveWatchlistPreservesActedOn(unittest.TestCase):
         self.assertFalse(row["acted_on"])
 
 
-# ── 10. Technical indicator calculations ──────────────────────────────────────
+# ── 11. Technical indicator calculations ─────────────────────────────────────
 
 class TestTechnicalIndicators(unittest.TestCase):
 

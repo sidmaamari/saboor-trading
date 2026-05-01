@@ -13,9 +13,9 @@ Saboor runs one strategy: long-term quality investing. It does not run a separat
 | Time (Oman) | Time (ET) | Phase | What Happens |
 |---|---|---|---|
 | 3:30 PM | 7:30 AM | Pre-market | Sharia screen -> yfinance research -> Analyst builds or refreshes candidate list |
-| 5:35 PM | 9:35 AM | Market Open | Analyst/Trader reviews entries, adds, trims, exits; Risk Guardian validates orders |
+| 5:35 PM | 9:35 AM | Market Open | Analyst/Trader reviews entries, adds, trims, exits; Risk Guardian validates orders; Telegram reports only executed trade decisions |
 | 8:00 PM | 12:00 PM | Midday | Reviews portfolio risk, thesis alerts, and urgent compliance/business changes |
-| 11:30 PM | 3:30 PM | EOD | Records benchmark performance and sends Telegram report |
+| 11:30 PM | 3:30 PM | EOD | Records benchmark performance; Telegram stays quiet unless there were buy/sell actions that day |
 
 ---
 
@@ -91,6 +91,12 @@ If staging into a position is intentional, document the tranche plan, the
 next-tranche trigger, and why staging is better than buying the full intended
 exposure now. A second same-day trade at nearly the same price is not allowed.
 ```
+
+### Telegram Reporting
+
+Telegram is for confirmed action, not possible trades. Pre-market candidates and watchlist ideas are kept internal and should not be sent to Telegram. Saboor sends a trade report only after a Buy, Add, Trim, or Exit order is approved and executed. If there are no trade actions for the day, Telegram stays quiet.
+
+Trade reports must include the full reason for each executed stock action. Messages should be split into multiple Telegram-safe parts when needed, not cut mid-sentence or mid-word.
 
 ### Valuation and Forward Return
 

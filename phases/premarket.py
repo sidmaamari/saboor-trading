@@ -8,7 +8,6 @@ from tools.sharia_screener import bulk_screen
 from tools.macro_client import get_macro_snapshot
 from agents.researcher import build_dossiers
 from agents.analyst import score_stocks
-from agents.notifier import send_premarket_report
 from db.queries import save_watchlist, log_decision
 from data.universe import get_universe
 
@@ -95,7 +94,6 @@ def run():
 
     if not scored:
         log_decision("premarket", None, "no_candidates", "No stocks passed scoring thresholds")
-        send_premarket_report([], excluded_count)
         print("No stocks passed thresholds — watchlist empty for today.")
         return []
 
@@ -122,7 +120,10 @@ def run():
         )
 
     below_threshold_count = len(scored) - len(qualified)
-    send_premarket_report(watchlist, excluded_count + below_threshold_count)
+    print(
+        "Telegram quiet: pre-market candidates are internal until a trade is approved "
+        f"({excluded_count + below_threshold_count} excluded or below threshold)."
+    )
 
     log_decision(
         "premarket", None, "phase_complete",
